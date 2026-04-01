@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 
 const ALLOWED_EMAIL = "weslleybertoldo18@gmail.com";
 
@@ -93,6 +95,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
+    if (Capacitor.isNativePlatform()) {
+      // No app nativo, abrir no in-app browser
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: "https://myfinances-app.vercel.app",
+          skipBrowserRedirect: true,
+        },
+      });
+      if (error) return { error: error.message };
+      if (data?.url) {
+        await Browser.open({ url: data.url });
+
+        // Escutar quando o browser fechar ou redirecionar
+        Browser.addListener("browserFinished", () => {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+              const email = session.user.email?.toLowerCase();
+              if (email === ALLOWED_EMAIL) {
+                setSession(session);
+                setUser(session.user);
+                seedCategories(session.user.id);
+              }
+            }
+          });
+        });
+      }
+      return { error: null };
+    }
+
+    // No browser normal
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
