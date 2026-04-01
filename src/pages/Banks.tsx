@@ -2,9 +2,9 @@ import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Building2, Wifi, WifiOff } from "lucide-react";
+import { Plus, RefreshCw, Building2, Wifi, WifiOff, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
-import { useAccounts } from "@/hooks/useAccounts";
+import { useAccounts, useDeleteAccount } from "@/hooks/useAccounts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { PluggyConnect } from "react-pluggy-connect";
@@ -13,6 +13,7 @@ export default function Banks() {
   const { data: accounts = [], isLoading } = useAccounts();
   const { user } = useAuth();
   const qc = useQueryClient();
+  const deleteAccount = useDeleteAccount();
   const [connectToken, setConnectToken] = useState<string | null>(null);
   const [showPluggy, setShowPluggy] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -54,6 +55,17 @@ export default function Banks() {
       setSyncMessage("Erro ao sincronizar");
     }
   }, [user, qc]);
+
+  const handlePluggyError = useCallback((error: { message?: string; code?: string }) => {
+    setShowPluggy(false);
+    const msg = error?.message || error?.code || "Erro desconhecido";
+    setSyncMessage(`Erro na conexão bancária: ${msg}. Tente novamente.`);
+  }, []);
+
+  const handleRemoveAccount = (id: string, bank: string) => {
+    if (!confirm(`Remover a conta do ${bank}? As transações vinculadas também serão removidas.`)) return;
+    deleteAccount.mutate(id);
+  };
 
   const handleSync = async (accountId: string, pluggyItemId: string | null) => {
     if (!pluggyItemId || !user) return;
@@ -116,7 +128,7 @@ export default function Banks() {
         <PluggyConnect
           connectToken={connectToken}
           onSuccess={handlePluggySuccess}
-          onError={() => { setShowPluggy(false); setSyncMessage("Erro na conexão bancária"); }}
+          onError={handlePluggyError as any}
           onClose={() => setShowPluggy(false)}
         />
       )}
@@ -178,6 +190,14 @@ export default function Banks() {
                 >
                   <RefreshCw className={`h-3 w-3 mr-1 ${syncing === account.id ? "animate-spin" : ""}`} />
                   {syncing === account.id ? "Sincronizando..." : "Sincronizar"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleRemoveAccount(account.id, account.bank)}
+                  disabled={deleteAccount.isPending}
+                >
+                  <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
             </CardContent>
