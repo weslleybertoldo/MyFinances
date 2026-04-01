@@ -2,75 +2,106 @@ name: Build APK
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version (ex: 1.0, 1.1)'
-        required: true
-        default: '1.0'
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
+          cache: npm
 
-      - name: Setup Java
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          java-version: 21
+          distribution: temurin
 
-      - name: Install Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Get current version
+        id: version
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y android-sdk
-          export ANDROID_HOME=/usr/lib/android-sdk
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          # Install build tools and platform
-          sudo mkdir -p $ANDROID_HOME/cmdline-tools
-          wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O cmdline-tools.zip
-          sudo unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
-          sudo mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          yes | sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null 2>&1
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build web app
+      - name: Build web assets
         run: npm run build
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Update version
-        run: |
-          VERSION=${{ github.event.inputs.version }}
-          VERSION_CODE=$(echo $VERSION | tr -d '.' | sed 's/^0*//')
-          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
-          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" android/app/build.gradle
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
       - name: Build APK
-        working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: cd android && ./gradlew assembleDebug
 
       - name: Rename APK
         run: |
-          VERSION=${{ github.event.inputs.version }}
-          mv android/app/build/outputs/apk/debug/app-debug.apk MyFinances-v${VERSION}.apk
+          VERSION=${{ steps.version.outputs.current }}
+          APK=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -1)
+          mv "$APK" MyFinances-v${VERSION}.apk
 
-      - name: Create Release
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyFinances
+          path: MyFinances-v${{ steps.version.outputs.current }}.apk
+          retention-days: 30
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: MyFinances v${{ github.event.inputs.version }}
-          files: MyFinances-v${{ github.event.inputs.version }}.apk
+          tag_name: v${{ steps.version.outputs.current }}
+          name: MyFinances v${{ steps.version.outputs.current }}
+          body: |
+            ## MyFinances v${{ steps.version.outputs.current }}
+            APK gerado automaticamente.
+            **Download:** Baixe o `MyFinances-v${{ steps.version.outputs.current }}.apk` abaixo.
+          files: MyFinances-v${{ steps.version.outputs.current }}.apk
           generate_release_notes: true
+          make_latest: true
+
+      - name: Bump version for next build
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR <<< "$CURRENT"
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT="$MAJOR.$NEXT_MINOR"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$NEXT';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          # Update version.json
+          node -e "
+            const fs = require('fs');
+            const v = JSON.parse(fs.readFileSync('public/version.json', 'utf8'));
+            v.version = '$NEXT';
+            v.apkUrl = 'https://github.com/weslleybertoldo/MyFinances/releases/download/v$NEXT/MyFinances-v$NEXT.apk';
+            fs.writeFileSync('public/version.json', JSON.stringify(v, null, 2) + '\n');
+          "
+          # Update UpdateChecker
+          sed -i "s/const APP_VERSION = \"[^\"]*\"/const APP_VERSION = \"$NEXT\"/" src/components/UpdateChecker.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json public/version.json src/components/UpdateChecker.tsx
+          git diff --staged --quiet || git commit -m "chore: bump version to v$NEXT [skip ci]"
+          git push
