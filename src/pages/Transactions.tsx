@@ -1,37 +1,42 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Search, Filter, Tag } from "lucide-react";
-import { mockTransactions, categories, formatCurrency, formatDate, type Transaction } from "@/lib/mock-data";
+import { formatCurrency, formatDate } from "@/lib/mock-data";
+import { useTransactions, useUpdateTransactionCategory } from "@/hooks/useTransactions";
+import { useCategories } from "@/hooks/useCategories";
 
 export default function Transactions() {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
 
-  const filtered = transactions.filter((t) => {
-    const matchSearch = t.description.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = filterCategory === "all" || t.category === filterCategory;
-    return matchSearch && matchCategory;
+  const { data: categories = [] } = useCategories();
+  const { data: transactions = [], isLoading } = useTransactions({
+    categoryId: filterCategory !== "all" ? filterCategory : undefined,
+    search: search || undefined,
   });
+  const updateCategory = useUpdateTransactionCategory();
 
-  const totalIncome = filtered.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExpense = filtered.filter((t) => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpense = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0);
 
-  const handleCategoryChange = (txId: string, newCategory: string) => {
-    const cat = categories.find((c) => c.name === newCategory);
-    setTransactions((prev) =>
-      prev.map((t) =>
-        t.id === txId ? { ...t, category: newCategory, categoryColor: cat?.color || t.categoryColor } : t
-      )
-    );
-    setEditingTx(null);
+  const handleCategoryChange = (txId: string, categoryId: string, description: string) => {
+    updateCategory.mutate({ transactionId: txId, categoryId, description });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Transações</h1>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -40,12 +45,11 @@ export default function Transactions() {
         <p className="text-muted-foreground">Gerencie e categorize suas transações</p>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Filtrado</p>
-            <p className="text-xl font-bold">{filtered.length} transações</p>
+            <p className="text-xl font-bold">{transactions.length} transações</p>
           </CardContent>
         </Card>
         <Card>
@@ -62,7 +66,6 @@ export default function Transactions() {
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="pt-4">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -83,7 +86,7 @@ export default function Transactions() {
               <SelectContent>
                 <SelectItem value="all">Todas as categorias</SelectItem>
                 {categories.map((c) => (
-                  <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -91,14 +94,13 @@ export default function Transactions() {
         </CardContent>
       </Card>
 
-      {/* Transaction List */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Lista de Transações</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
-            {filtered.map((t) => (
+            {transactions.map((t) => (
               <div
                 key={t.id}
                 className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group"
@@ -111,10 +113,7 @@ export default function Transactions() {
                       <span className="text-xs text-muted-foreground">{formatDate(t.date)}</span>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <button
-                            onClick={() => setEditingTx(t)}
-                            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-accent transition-colors"
-                          >
+                          <button className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-accent transition-colors">
                             <Tag className="h-3 w-3" />
                             {t.category}
                           </button>
@@ -129,11 +128,11 @@ export default function Transactions() {
                           <div className="grid grid-cols-2 gap-2">
                             {categories.map((c) => (
                               <Button
-                                key={c.name}
-                                variant={t.category === c.name ? "default" : "outline"}
+                                key={c.id}
+                                variant={t.categoryId === c.id ? "default" : "outline"}
                                 size="sm"
                                 className="justify-start"
-                                onClick={() => handleCategoryChange(t.id, c.name)}
+                                onClick={() => handleCategoryChange(t.id, c.id, t.description)}
                               >
                                 <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: c.color }} />
                                 {c.name}
@@ -150,7 +149,7 @@ export default function Transactions() {
                 </span>
               </div>
             ))}
-            {filtered.length === 0 && (
+            {transactions.length === 0 && (
               <p className="text-center py-8 text-muted-foreground">Nenhuma transação encontrada</p>
             )}
           </div>

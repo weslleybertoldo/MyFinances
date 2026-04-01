@@ -7,21 +7,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, CalendarClock, TrendingUp, TrendingDown, Check } from "lucide-react";
-import { mockFutureLaunches, mockAccounts, categories, formatCurrency, type FutureLaunch } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/mock-data";
+import { useFutureLaunches, useCreateFutureLaunch, useUpdateFutureLaunch, useDeleteFutureLaunch } from "@/hooks/useFutureLaunches";
+import { useTotalBalance } from "@/hooks/useAccounts";
+import { useCategories } from "@/hooks/useCategories";
 
 export default function FutureLaunches() {
-  const [launches, setLaunches] = useState<FutureLaunch[]>(mockFutureLaunches);
+  const { data: launches = [], isLoading } = useFutureLaunches();
+  const { data: categories = [] } = useCategories();
+  const currentBalance = useTotalBalance();
+  const createLaunch = useCreateFutureLaunch();
+  const updateLaunch = useUpdateFutureLaunch();
+  const deleteLaunch = useDeleteFutureLaunch();
+
   const [showAdd, setShowAdd] = useState(false);
   const [newLaunch, setNewLaunch] = useState({
     description: "",
     amount: "",
     dueDate: "",
-    category: "Outros",
+    categoryId: "",
     type: "expense" as "income" | "expense",
     recurring: false,
   });
-
-  const currentBalance = mockAccounts.reduce((s, a) => s + a.balance, 0);
 
   // Build forecast
   const sortedLaunches = [...launches].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -35,34 +42,41 @@ export default function FutureLaunches() {
   const totalFutureExpense = launches.filter((l) => l.type === "expense" && !l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
   const projectedBalance = currentBalance + totalFutureIncome - totalFutureExpense;
 
-  const togglePaid = (id: string) => {
-    setLaunches((prev) => prev.map((l) => (l.id === id ? { ...l, paid: !l.paid } : l)));
+  const togglePaid = (id: string, currentPaid: boolean) => {
+    updateLaunch.mutate({ id, paid: !currentPaid });
   };
 
   const handleAdd = () => {
     if (!newLaunch.description || !newLaunch.amount || !newLaunch.dueDate) return;
-    const amount = parseFloat(newLaunch.amount);
-    const launch: FutureLaunch = {
-      id: Date.now().toString(),
+    createLaunch.mutate({
       description: newLaunch.description,
-      amount: newLaunch.type === "expense" ? -Math.abs(amount) : Math.abs(amount),
-      dueDate: newLaunch.dueDate,
-      category: newLaunch.category,
+      amount: parseFloat(newLaunch.amount),
       type: newLaunch.type,
+      due_date: newLaunch.dueDate,
+      category_id: newLaunch.categoryId || undefined,
       recurring: newLaunch.recurring,
-      paid: false,
-    };
-    setLaunches((prev) => [...prev, launch]);
-    setNewLaunch({ description: "", amount: "", dueDate: "", category: "Outros", type: "expense", recurring: false });
+    });
+    setNewLaunch({ description: "", amount: "", dueDate: "", categoryId: "", type: "expense", recurring: false });
     setShowAdd(false);
   };
 
   const removeLaunch = (id: string) => {
-    setLaunches((prev) => prev.filter((l) => l.id !== id));
+    deleteLaunch.mutate(id);
   };
 
   const formatDueDate = (d: string) =>
     new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date(d));
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Lançamentos Futuros</h1>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -96,11 +110,11 @@ export default function FutureLaunches() {
                 value={newLaunch.dueDate}
                 onChange={(e) => setNewLaunch({ ...newLaunch, dueDate: e.target.value })}
               />
-              <Select value={newLaunch.category} onValueChange={(v) => setNewLaunch({ ...newLaunch, category: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={newLaunch.categoryId} onValueChange={(v) => setNewLaunch({ ...newLaunch, categoryId: v })}>
+                <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
-                    <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -118,13 +132,14 @@ export default function FutureLaunches() {
                 />
                 <span className="text-sm">Recorrente (mensal)</span>
               </div>
-              <Button className="w-full" onClick={handleAdd}>Adicionar</Button>
+              <Button className="w-full" onClick={handleAdd} disabled={createLaunch.isPending}>
+                {createLaunch.isPending ? "Adicionando..." : "Adicionar"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Forecast Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -157,14 +172,12 @@ export default function FutureLaunches() {
         </Card>
       </div>
 
-      {/* Forecast Timeline */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Previsão de Saldo</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
-            {/* Current balance row */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20">
               <div>
                 <p className="font-medium text-sm">Saldo Atual</p>
@@ -173,16 +186,20 @@ export default function FutureLaunches() {
               <span className="font-bold text-sm">{formatCurrency(currentBalance)}</span>
             </div>
 
+            {forecast.length === 0 && (
+              <p className="text-center py-8 text-muted-foreground">Nenhum lançamento futuro</p>
+            )}
+
             {forecast.map((l) => (
               <div
                 key={l.id}
-                className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                className={`flex items-center justify-between p-3 rounded-lg transition-colors group ${
                   l.paid ? "opacity-50 bg-muted/30" : "hover:bg-muted/50"
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <button
-                    onClick={() => togglePaid(l.id)}
+                    onClick={() => togglePaid(l.id, l.paid)}
                     className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                       l.paid ? "bg-success border-success" : "border-muted-foreground/30"
                     }`}

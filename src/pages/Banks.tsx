@@ -3,51 +3,56 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Link2, Plus, RefreshCw, Building2, Wifi, WifiOff } from "lucide-react";
-import { mockAccounts, formatCurrency, type BankAccount } from "@/lib/mock-data";
+import { Plus, RefreshCw, Building2, Wifi, WifiOff } from "lucide-react";
+import { formatCurrency } from "@/lib/mock-data";
+import { useAccounts, useCreateAccount, useUpdateAccount } from "@/hooks/useAccounts";
 
 const availableBanks = [
-  { name: "Nubank", color: "hsl(280, 100%, 40%)" },
-  { name: "Itaú", color: "hsl(25, 95%, 53%)" },
-  { name: "Bradesco", color: "hsl(0, 84%, 60%)" },
-  { name: "Banco do Brasil", color: "hsl(47, 96%, 53%)" },
-  { name: "Santander", color: "hsl(0, 84%, 50%)" },
-  { name: "Caixa", color: "hsl(217, 91%, 60%)" },
-  { name: "Inter", color: "hsl(25, 95%, 53%)" },
-  { name: "C6 Bank", color: "hsl(220, 10%, 20%)" },
+  { name: "Nubank", color: "#7C3AED" },
+  { name: "Itaú", color: "#F97316" },
+  { name: "Bradesco", color: "#EF4444" },
+  { name: "Banco do Brasil", color: "#EAB308" },
+  { name: "Santander", color: "#DC2626" },
+  { name: "Caixa", color: "#3B82F6" },
+  { name: "Inter", color: "#F97316" },
+  { name: "C6 Bank", color: "#1F2937" },
 ];
 
 export default function Banks() {
-  const [accounts, setAccounts] = useState<BankAccount[]>(mockAccounts);
+  const { data: accounts = [], isLoading } = useAccounts();
+  const createAccount = useCreateAccount();
+  const updateAccount = useUpdateAccount();
   const [showConnect, setShowConnect] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
 
   const handleSync = (id: string) => {
     setSyncing(id);
+    // Placeholder — Pluggy integration virá depois
     setTimeout(() => setSyncing(null), 2000);
   };
 
   const handleConnect = (bankName: string, bankColor: string) => {
-    const newAccount: BankAccount = {
-      id: Date.now().toString(),
-      name: "Conta Corrente",
-      bank: bankName,
-      balance: 0,
-      color: bankColor,
-      connected: true,
-    };
-    setAccounts((prev) => [...prev, newAccount]);
+    createAccount.mutate({ name: "Conta Corrente", bank: bankName, balance: 0, color: bankColor });
     setShowConnect(false);
   };
 
-  const toggleConnection = (id: string) => {
-    setAccounts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, connected: !a.connected } : a))
-    );
+  const toggleConnection = (id: string, currentlyConnected: boolean) => {
+    updateAccount.mutate({ id, connected: !currentlyConnected });
   };
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
   const connectedCount = accounts.filter((a) => a.connected).length;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Bancos</h1>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -74,6 +79,7 @@ export default function Banks() {
                   variant="outline"
                   className="h-16 flex flex-col gap-1"
                   onClick={() => handleConnect(bank.name, bank.color)}
+                  disabled={createAccount.isPending}
                 >
                   <Building2 className="h-5 w-5" style={{ color: bank.color }} />
                   <span className="text-xs">{bank.name}</span>
@@ -87,7 +93,6 @@ export default function Banks() {
         </Dialog>
       </div>
 
-      {/* Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -109,8 +114,10 @@ export default function Banks() {
         </Card>
       </div>
 
-      {/* Account Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {accounts.length === 0 && (
+          <p className="text-muted-foreground col-span-2 text-center py-8">Nenhuma conta cadastrada. Clique em "Conectar Banco" para começar.</p>
+        )}
         {accounts.map((account) => (
           <Card key={account.id} className="overflow-hidden">
             <div className="h-1" style={{ backgroundColor: account.color }} />
@@ -147,7 +154,7 @@ export default function Banks() {
                 <Button
                   variant={account.connected ? "destructive" : "default"}
                   size="sm"
-                  onClick={() => toggleConnection(account.id)}
+                  onClick={() => toggleConnection(account.id, account.connected)}
                 >
                   {account.connected ? "Desconectar" : "Reconectar"}
                 </Button>
