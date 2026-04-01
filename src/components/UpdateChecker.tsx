@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, RefreshCw } from "lucide-react";
 
-const APP_VERSION = "1.1";
+const APP_VERSION = "1.2";
 
 interface VersionInfo {
   version: string;
