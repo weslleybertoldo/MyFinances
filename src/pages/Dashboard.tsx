@@ -1,14 +1,39 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDownIcon, ArrowUpIcon, WalletIcon, TrendingUpIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowDownIcon, ArrowUpIcon, WalletIcon, TrendingUpIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mock-data";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useTransactions } from "@/hooks/useTransactions";
 
+const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function getMonthStr(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthLabel(monthStr: string) {
+  const [year, month] = monthStr.split("-");
+  return `${MONTH_NAMES[Number(month) - 1]} ${year}`;
+}
+
 export default function Dashboard() {
-  const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const [selectedMonth, setSelectedMonth] = useState(() => getMonthStr(new Date()));
   const { data: accounts = [], isLoading: loadingAccounts } = useAccounts();
-  const { data: transactions = [], isLoading: loadingTx } = useTransactions({ month: currentMonth });
+  const { data: transactions = [], isLoading: loadingTx } = useTransactions({ month: selectedMonth });
+
+  const prevMonth = () => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m - 2, 1);
+    setSelectedMonth(getMonthStr(d));
+  };
+
+  const nextMonth = () => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m, 1);
+    setSelectedMonth(getMonthStr(d));
+  };
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
   const monthIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
@@ -45,9 +70,20 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Visão geral das suas finanças</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Visão geral das suas finanças</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={prevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium min-w-[140px] text-center">{getMonthLabel(selectedMonth)}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={nextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
