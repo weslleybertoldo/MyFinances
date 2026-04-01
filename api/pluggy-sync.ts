@@ -5,6 +5,10 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+export const config = {
+  maxDuration: 60,
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -19,6 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const syncedAccounts: any[] = [];
+    let totalTxSynced = 0;
 
     // 1. Fetch accounts from Pluggy
     const accountsData = await pluggy.fetchAccounts(itemId);
@@ -64,34 +69,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const txData = await pluggy.fetchTransactions(pa.id, { pageSize: 500 });
       const pluggyTransactions = txData.results || [];
 
-      for (const pt of pluggyTransactions) {
-        // Skip if already synced
-        const { data: existingTx } = await supabase
-          .from("transactions")
-          .select("id")
-          .eq("pluggy_transaction_id", pt.id)
-          .maybeSingle();
+      // Get existing pluggy transaction IDs to avoid duplicates
+      const { data: existingTxs } = await supabase
+        .from("transactions")
+        .select("pluggy_transaction_id")
+        .eq("account_id", accountDbId)
+        .not("pluggy_transaction_id", "is", null);
 
-        if (existingTx) continue;
+      const existingIds = new Set((existingTxs || []).map((t: any) => t.pluggy_transaction_id));
 
-        const amount = Math.abs(pt.amount);
-        const type = pt.type === "CREDIT" ? "income" : "expense";
-        const rawDate = pt.date ? String(pt.date) : new Date().toISOString();
-        const date = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.slice(0, 10);
-
-        await supabase.from("transactions").insert({
-          user_id: userId,
-          account_id: accountDbId,
-          description: pt.description || pt.descriptionRaw || "Sem descrição",
-          amount,
-          type,
-          date,
-          pluggy_transaction_id: pt.id,
+      // Batch insert new transactions
+      const newTransactions = pluggyTransactions
+        .filter((pt: any) => !existingIds.has(pt.id))
+        .map((pt: any) => {
+          const rawDate = pt.date ? String(pt.date) : new Date().toISOString();
+          const date = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.slice(0, 10);
+          return {
+            user_id: userId,
+            account_id: accountDbId,
+            description: pt.description || pt.descriptionRaw || "Sem descrição",
+            amount: Math.abs(pt.amount),
+            type: pt.type === "CREDIT" ? "income" : "expense",
+            date,
+            pluggy_transaction_id: pt.id,
+          };
         });
+
+      if (newTransactions.length > 0) {
+        const { error: insertError } = await supabase.from("transactions").insert(newTransactions);
+        if (insertError) {
+          console.error("Insert error:", insertError.message);
+        } else {
+          totalTxSynced += newTransactions.length;
+        }
       }
     }
 
-    return res.json({ success: true, accounts: syncedAccounts });
+    return res.json({ success: true, accounts: syncedAccounts, transactionsSynced: totalTxSynced });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
