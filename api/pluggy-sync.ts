@@ -76,7 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const amount = Math.abs(pt.amount);
         const type = pt.type === "CREDIT" ? "income" : "expense";
-        const date = pt.date ? pt.date.split("T")[0] : new Date().toISOString().split("T")[0];
+        const rawDate = pt.date ? String(pt.date) : new Date().toISOString();
+        const date = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.slice(0, 10);
 
         await supabase.from("transactions").insert({
           user_id: userId,
