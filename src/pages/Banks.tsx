@@ -127,6 +127,7 @@ export default function Banks() {
       {showPluggy && connectToken && (
         <PluggyConnect
           connectToken={connectToken}
+          includeSandbox={true}
           onSuccess={handlePluggySuccess}
           onError={handlePluggyError as any}
           onClose={() => setShowPluggy(false)}
