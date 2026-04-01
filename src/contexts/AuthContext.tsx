@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -28,15 +28,19 @@ const DEFAULT_CATEGORIES = [
 ];
 
 async function seedCategories(userId: string) {
-  const { count } = await supabase
-    .from("categories")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
+  try {
+    const { count } = await supabase
+      .from("categories")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
 
-  if (count === 0) {
-    await supabase.from("categories").insert(
-      DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId }))
-    );
+    if (count === 0) {
+      await supabase.from("categories").insert(
+        DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId }))
+      );
+    }
+  } catch {
+    // silently fail
   }
 }
 
@@ -44,38 +48,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const signingOut = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session);
+      if (session?.user) {
+        const email = session.user.email?.toLowerCase();
+        if (email === ALLOWED_EMAIL) {
+          setSession(session);
+          setUser(session.user);
+          seedCategories(session.user.id);
+        }
+      }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (signingOut.current) return;
+
+      if (event === "SIGNED_IN" && session?.user) {
+        const email = session.user.email?.toLowerCase();
+        if (email !== ALLOWED_EMAIL) {
+          signingOut.current = true;
+          supabase.auth.signOut().then(() => {
+            signingOut.current = false;
+          });
+          setSession(null);
+          setUser(null);
+          return;
+        }
+        setSession(session);
+        setUser(session.user);
+        seedCategories(session.user.id);
+      } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        setSession(session);
+        setUser(session.user);
+      } else if (event === "SIGNED_OUT") {
+        setSession(null);
+        setUser(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const handleSession = async (session: Session | null) => {
-    if (session?.user) {
-      const email = session.user.email?.toLowerCase();
-      if (email !== ALLOWED_EMAIL) {
-        // Email não autorizado — faz logout
-        await supabase.auth.signOut();
-        setSession(null);
-        setUser(null);
-        return;
-      }
-      setSession(session);
-      setUser(session.user);
-      seedCategories(session.user.id);
-    } else {
-      setSession(null);
-      setUser(null);
-    }
-  };
 
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -88,7 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    signingOut.current = true;
     await supabase.auth.signOut();
+    signingOut.current = false;
+    setSession(null);
+    setUser(null);
   };
 
   return (
