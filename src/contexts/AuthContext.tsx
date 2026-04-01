@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
+const ALLOWED_EMAIL = "weslleybertoldo18@gmail.com";
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -46,28 +47,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) seedCategories(session.user.id);
+      handleSession(session);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) seedCategories(session.user.id);
+      handleSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+  const handleSession = async (session: Session | null) => {
+    if (session?.user) {
+      const email = session.user.email?.toLowerCase();
+      if (email !== ALLOWED_EMAIL) {
+        // Email não autorizado — faz logout
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        return;
+      }
+      setSession(session);
+      setUser(session.user);
+      seedCategories(session.user.id);
+    } else {
+      setSession(null);
+      setUser(null);
+    }
   };
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
     return { error: error?.message ?? null };
   };
 
@@ -76,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );
