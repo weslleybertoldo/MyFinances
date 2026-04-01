@@ -82,8 +82,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const newTransactions = pluggyTransactions
         .filter((pt: any) => !existingIds.has(pt.id))
         .map((pt: any) => {
-          const rawDate = pt.date ? String(pt.date) : new Date().toISOString();
-          const date = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.slice(0, 10);
+          const dateObj = pt.date instanceof Date ? pt.date : new Date(pt.date || Date.now());
+          const date = dateObj.toISOString().split("T")[0];
           return {
             user_id: userId,
             account_id: accountDbId,
