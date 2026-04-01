@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MyFinances</string>
+    <string name="title_activity_main">MyFinances</string>
+    <string name="package_name">com.weslley.myfinances</string>
+    <string name="custom_url_scheme">com.weslley.myfinances</string>
+</resources>
