@@ -33,6 +33,8 @@ export function mapAccount(row: AccountRow): BankAccount {
     balance: Number(row.balance),
     color: row.color,
     connected: row.connected,
+    pluggyItemId: row.pluggy_item_id,
+    pluggyAccountId: row.pluggy_account_id,
   };
 }
 

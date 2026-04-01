@@ -5,6 +5,8 @@ export interface BankAccount {
   balance: number;
   color: string;
   connected: boolean;
+  pluggyItemId: string | null;
+  pluggyAccountId: string | null;
 }
 
 export interface Transaction {

@@ -1,43 +1,83 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, RefreshCw, Building2, Wifi, WifiOff } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
-import { useAccounts, useCreateAccount, useUpdateAccount } from "@/hooks/useAccounts";
-
-const availableBanks = [
-  { name: "Nubank", color: "#7C3AED" },
-  { name: "Itaú", color: "#F97316" },
-  { name: "Bradesco", color: "#EF4444" },
-  { name: "Banco do Brasil", color: "#EAB308" },
-  { name: "Santander", color: "#DC2626" },
-  { name: "Caixa", color: "#3B82F6" },
-  { name: "Inter", color: "#F97316" },
-  { name: "C6 Bank", color: "#1F2937" },
-];
+import { useAccounts } from "@/hooks/useAccounts";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { PluggyConnect } from "react-pluggy-connect";
 
 export default function Banks() {
   const { data: accounts = [], isLoading } = useAccounts();
-  const createAccount = useCreateAccount();
-  const updateAccount = useUpdateAccount();
-  const [showConnect, setShowConnect] = useState(false);
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [connectToken, setConnectToken] = useState<string | null>(null);
+  const [showPluggy, setShowPluggy] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState("");
 
-  const handleSync = (id: string) => {
-    setSyncing(id);
-    // Placeholder — Pluggy integration virá depois
-    setTimeout(() => setSyncing(null), 2000);
+  const openPluggyConnect = async () => {
+    try {
+      const res = await fetch("/api/pluggy-token", { method: "POST" });
+      const data = await res.json();
+      if (data.accessToken) {
+        setConnectToken(data.accessToken);
+        setShowPluggy(true);
+      } else {
+        setSyncMessage("Erro ao obter token do Pluggy");
+      }
+    } catch {
+      setSyncMessage("Erro de conexão com o servidor");
+    }
   };
 
-  const handleConnect = (bankName: string, bankColor: string) => {
-    createAccount.mutate({ name: "Conta Corrente", bank: bankName, balance: 0, color: bankColor });
-    setShowConnect(false);
-  };
+  const handlePluggySuccess = useCallback(async (data: { item: { id: string } }) => {
+    setShowPluggy(false);
+    setSyncMessage("Sincronizando dados bancários...");
+    try {
+      const res = await fetch("/api/pluggy-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: data.item.id, userId: user?.id }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setSyncMessage(`Sincronizado! ${result.accounts?.length || 0} conta(s) encontrada(s)`);
+        qc.invalidateQueries({ queryKey: ["accounts"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
+      } else {
+        setSyncMessage(`Erro: ${result.error}`);
+      }
+    } catch {
+      setSyncMessage("Erro ao sincronizar");
+    }
+  }, [user, qc]);
 
-  const toggleConnection = (id: string, currentlyConnected: boolean) => {
-    updateAccount.mutate({ id, connected: !currentlyConnected });
+  const handleSync = async (accountId: string, pluggyItemId: string | null) => {
+    if (!pluggyItemId || !user) return;
+    setSyncing(accountId);
+    setSyncMessage("");
+    try {
+      const res = await fetch("/api/pluggy-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: pluggyItemId, userId: user.id }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setSyncMessage("Dados atualizados!");
+        qc.invalidateQueries({ queryKey: ["accounts"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
+      } else {
+        setSyncMessage(`Erro: ${result.error}`);
+      }
+    } catch {
+      setSyncMessage("Erro ao sincronizar");
+    } finally {
+      setSyncing(null);
+    }
   };
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
@@ -61,37 +101,25 @@ export default function Banks() {
           <h1 className="text-2xl font-bold">Bancos</h1>
           <p className="text-muted-foreground">Gerencie suas contas bancárias conectadas</p>
         </div>
-        <Dialog open={showConnect} onOpenChange={setShowConnect}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Conectar Banco</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Conectar Novo Banco</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground mb-4">
-              Selecione seu banco para conectar via Open Finance (Pluggy)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {availableBanks.map((bank) => (
-                <Button
-                  key={bank.name}
-                  variant="outline"
-                  className="h-16 flex flex-col gap-1"
-                  onClick={() => handleConnect(bank.name, bank.color)}
-                  disabled={createAccount.isPending}
-                >
-                  <Building2 className="h-5 w-5" style={{ color: bank.color }} />
-                  <span className="text-xs">{bank.name}</span>
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              🔒 Conexão segura via Open Finance / Pluggy
-            </p>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={openPluggyConnect}>
+          <Plus className="h-4 w-4 mr-2" />Conectar Banco
+        </Button>
       </div>
+
+      {syncMessage && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+          {syncMessage}
+        </div>
+      )}
+
+      {showPluggy && connectToken && (
+        <PluggyConnect
+          connectToken={connectToken}
+          onSuccess={handlePluggySuccess}
+          onError={() => { setShowPluggy(false); setSyncMessage("Erro na conexão bancária"); }}
+          onClose={() => setShowPluggy(false)}
+        />
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
@@ -118,7 +146,7 @@ export default function Banks() {
         {accounts.length === 0 && (
           <p className="text-muted-foreground col-span-2 text-center py-8">Nenhuma conta cadastrada. Clique em "Conectar Banco" para começar.</p>
         )}
-        {accounts.map((account) => (
+        {accounts.map((account: any) => (
           <Card key={account.id} className="overflow-hidden">
             <div className="h-1" style={{ backgroundColor: account.color }} />
             <CardHeader className="pb-2">
@@ -145,18 +173,11 @@ export default function Banks() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => handleSync(account.id)}
-                  disabled={!account.connected || syncing === account.id}
+                  onClick={() => handleSync(account.id, account.pluggyItemId)}
+                  disabled={!account.connected || syncing === account.id || !account.pluggyItemId}
                 >
                   <RefreshCw className={`h-3 w-3 mr-1 ${syncing === account.id ? "animate-spin" : ""}`} />
                   {syncing === account.id ? "Sincronizando..." : "Sincronizar"}
-                </Button>
-                <Button
-                  variant={account.connected ? "destructive" : "default"}
-                  size="sm"
-                  onClick={() => toggleConnection(account.id, account.connected)}
-                >
-                  {account.connected ? "Desconectar" : "Reconectar"}
                 </Button>
               </div>
             </CardContent>
