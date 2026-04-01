@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, CheckCircle, X } from "lucide-react";
 
-const APP_VERSION = "1.0";
+const APP_VERSION = "1.1";
 
 interface VersionInfo {
   version: string;

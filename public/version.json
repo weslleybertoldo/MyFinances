@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
-  "apkUrl": "https://github.com/weslleybertoldo/MyFinances/releases/download/v1.0/MyFinances-v1.0.apk",
+  "version": "1.1",
+  "apkUrl": "https://github.com/weslleybertoldo/MyFinances/releases/download/v1.1/MyFinances-v1.1.apk",
   "changelog": "Versão inicial — login Google, contas bancárias, transações, lançamentos futuros, integração Pluggy"
 }
