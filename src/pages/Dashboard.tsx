@@ -4,7 +4,6 @@ import { ArrowDownIcon, ArrowUpIcon, WalletIcon, TrendingUpIcon } from "lucide-r
 import { formatCurrency, formatDate } from "@/lib/mock-data";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useTransactions } from "@/hooks/useTransactions";
-import UpdateChecker from "@/components/UpdateChecker";
 
 export default function Dashboard() {
   const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
@@ -46,7 +45,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <UpdateChecker />
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Visão geral das suas finanças</p>

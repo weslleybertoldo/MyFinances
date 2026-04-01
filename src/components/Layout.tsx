@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import UpdateChecker from "@/components/UpdateChecker";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-sm text-muted-foreground">Controle Financeiro Pessoal</span>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+          <footer className="border-t bg-card px-4 py-2">
+            <UpdateChecker />
+          </footer>
         </div>
       </div>
     </SidebarProvider>
