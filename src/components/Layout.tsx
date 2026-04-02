@@ -10,7 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col">
           <header className="h-14 flex items-center border-b bg-card px-4 gap-4">
             <SidebarTrigger />
-            <span className="text-sm text-muted-foreground">Controle Financeiro Pessoal</span>
+            <span className="text-sm font-medium">MyFinances</span>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
           <footer className="border-t bg-card px-4 py-2">

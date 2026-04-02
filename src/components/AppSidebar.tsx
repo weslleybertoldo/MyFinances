@@ -1,6 +1,5 @@
 import { LayoutDashboard, ArrowLeftRight, CalendarClock, Link2, LogOut, Settings } from "lucide-react";
-import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
@@ -17,16 +16,22 @@ import {
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Transações", url: "/transacoes", icon: ArrowLeftRight },
-  { title: "Lançamentos Futuros", url: "/lancamentos", icon: CalendarClock },
+  { title: "Lançamentos", url: "/lancamentos", icon: CalendarClock },
   { title: "Bancos", url: "/bancos", icon: Link2 },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  const handleNav = (url: string) => {
+    navigate(url);
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -34,7 +39,7 @@ export function AppSidebar() {
         <div className="p-4">
           {!collapsed && (
             <h1 className="text-lg font-bold text-sidebar-foreground">
-              💰 FinControl
+              MyFin
             </h1>
           )}
           {collapsed && <span className="text-xl">💰</span>}
@@ -43,21 +48,20 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+              {items.map((item) => {
+                const isActive = item.url === "/" ? location.pathname === "/" : location.pathname.startsWith(item.url);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      onClick={() => handleNav(item.url)}
+                      className={isActive ? "bg-sidebar-accent text-sidebar-primary font-medium" : "hover:bg-sidebar-accent/50"}
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

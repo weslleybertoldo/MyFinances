@@ -1,8 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { Browser } from "@capacitor/browser";
-import { Capacitor } from "@capacitor/core";
+import { signInWithGoogle as capacitorSignIn, setupDeepLinkListener } from "@/lib/capacitorAuth";
 
 const ALLOWED_EMAIL = "weslleybertoldo18@gmail.com";
 
@@ -53,6 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signingOut = useRef(false);
 
   useEffect(() => {
+    // Setup deep link listener para Capacitor
+    setupDeepLinkListener();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const email = session.user.email?.toLowerCase();
@@ -94,46 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithGoogle = async () => {
-    if (Capacitor.isNativePlatform()) {
-      // No app nativo, abrir no in-app browser
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: "https://myfinances-app.vercel.app",
-          skipBrowserRedirect: true,
-        },
-      });
-      if (error) return { error: error.message };
-      if (data?.url) {
-        await Browser.open({ url: data.url });
-
-        // Escutar quando o browser fechar ou redirecionar
-        await Browser.removeAllListeners();
-        Browser.addListener("browserFinished", () => {
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.user) {
-              const email = session.user.email?.toLowerCase();
-              if (email === ALLOWED_EMAIL) {
-                setSession(session);
-                setUser(session.user);
-                seedCategories(session.user.id);
-              }
-            }
-          });
-        });
-      }
-      return { error: null };
-    }
-
-    // No browser normal
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    return { error: error?.message ?? null };
+  const signInWithGoogle = async (): Promise<{ error: string | null }> => {
+    const result = await capacitorSignIn();
+    return { error: result.error ?? null };
   };
 
   const signOut = async () => {
