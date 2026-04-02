@@ -109,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await Browser.open({ url: data.url });
 
         // Escutar quando o browser fechar ou redirecionar
+        await Browser.removeAllListeners();
         Browser.addListener("browserFinished", () => {
           supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {

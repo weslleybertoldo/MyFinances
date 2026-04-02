@@ -9,11 +9,17 @@ interface TransactionFilters {
   month?: string; // "YYYY-MM"
   categoryId?: string;
   search?: string;
+  page?: number;
+  pageSize?: number;
 }
+
+const DEFAULT_PAGE_SIZE = 100;
 
 export function useTransactions(filters?: TransactionFilters) {
   const { user } = useAuth();
   const { data: catMap } = useCategoryMap();
+  const page = filters?.page ?? 0;
+  const pageSize = filters?.pageSize ?? DEFAULT_PAGE_SIZE;
 
   return useQuery<Transaction[]>({
     queryKey: ["transactions", user?.id, filters],
@@ -23,7 +29,8 @@ export function useTransactions(filters?: TransactionFilters) {
         .from("transactions")
         .select("*")
         .eq("user_id", user!.id)
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (filters?.month) {
         const [year, month] = filters.month.split("-");
@@ -37,17 +44,15 @@ export function useTransactions(filters?: TransactionFilters) {
         query = query.eq("category_id", filters.categoryId);
       }
 
+      if (filters?.search) {
+        const escaped = filters.search.replace(/%/g, "\\%").replace(/_/g, "\\_");
+        query = query.ilike("description", `%${escaped}%`);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
-      let mapped = (data ?? []).map((row) => mapTransaction(row, catMap!));
-
-      if (filters?.search) {
-        const s = filters.search.toLowerCase();
-        mapped = mapped.filter((t) => t.description.toLowerCase().includes(s));
-      }
-
-      return mapped;
+      return (data ?? []).map((row) => mapTransaction(row, catMap!));
     },
   });
 }
@@ -91,6 +96,9 @@ export function useCreateTransaction() {
       });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
   });
 }

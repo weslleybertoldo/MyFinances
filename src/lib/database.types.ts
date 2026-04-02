@@ -131,6 +131,9 @@ export interface Database {
           due_date: string;
           recurring: boolean;
           paid: boolean;
+          group_id: string | null;
+          parcel_number: number | null;
+          total_parcels: number | null;
           created_at: string;
         };
         Insert: {
@@ -143,6 +146,9 @@ export interface Database {
           due_date: string;
           recurring?: boolean;
           paid?: boolean;
+          group_id?: string | null;
+          parcel_number?: number | null;
+          total_parcels?: number | null;
           created_at?: string;
         };
         Update: {
@@ -155,6 +161,9 @@ export interface Database {
           due_date?: string;
           recurring?: boolean;
           paid?: boolean;
+          group_id?: string | null;
+          parcel_number?: number | null;
+          total_parcels?: number | null;
           created_at?: string;
         };
         Relationships: [];

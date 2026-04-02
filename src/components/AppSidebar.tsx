@@ -1,4 +1,4 @@
-import { LayoutDashboard, ArrowLeftRight, CalendarClock, Link2, LogOut } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, CalendarClock, Link2, LogOut, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ const items = [
   { title: "Transações", url: "/transacoes", icon: ArrowLeftRight },
   { title: "Lançamentos Futuros", url: "/lancamentos", icon: CalendarClock },
   { title: "Bancos", url: "/bancos", icon: Link2 },
+  { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
 export function AppSidebar() {

@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const syncedAccounts: any[] = [];
+    const syncedAccounts: Array<{ id: string; name: string; balance: number; action: "created" | "updated" }> = [];
     let totalTxSynced = 0;
 
     // 1. Fetch accounts from Pluggy
@@ -76,12 +76,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq("account_id", accountDbId)
         .not("pluggy_transaction_id", "is", null);
 
-      const existingIds = new Set((existingTxs || []).map((t: any) => t.pluggy_transaction_id));
+      const existingIds = new Set((existingTxs || []).map((t: { pluggy_transaction_id: string }) => t.pluggy_transaction_id));
 
       // Batch insert new transactions
       const newTransactions = pluggyTransactions
-        .filter((pt: any) => !existingIds.has(pt.id))
-        .map((pt: any) => {
+        .filter((pt) => !existingIds.has(pt.id))
+        .map((pt) => {
           const dateObj = pt.date instanceof Date ? pt.date : new Date(pt.date || Date.now());
           const date = dateObj.toISOString().split("T")[0];
           return {
@@ -106,7 +106,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.json({ success: true, accounts: syncedAccounts, transactionsSynced: totalTxSynced });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    return res.status(500).json({ error: message });
   }
 }

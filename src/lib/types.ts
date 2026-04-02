@@ -32,6 +32,9 @@ export interface FutureLaunch {
   type: "income" | "expense";
   recurring: boolean;
   paid: boolean;
+  groupId: string | null;
+  parcelNumber: number | null;
+  totalParcels: number | null;
 }
 
 export interface Category {

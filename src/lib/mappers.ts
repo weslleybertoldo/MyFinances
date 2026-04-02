@@ -68,5 +68,8 @@ export function mapFutureLaunch(row: FutureLaunchRow, catMap: CategoryMap): Futu
     type: row.type as "income" | "expense",
     recurring: row.recurring,
     paid: row.paid,
+    groupId: row.group_id,
+    parcelNumber: row.parcel_number,
+    totalParcels: row.total_parcels,
   };
 }

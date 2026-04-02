@@ -10,6 +10,20 @@ interface VersionInfo {
   changelog: string;
 }
 
+/** Compara versões semânticas (ex: "1.4" vs "1.10"). Retorna true se remote > local */
+function isNewerVersion(remote: string, local: string): boolean {
+  const rParts = remote.split(".").map(Number);
+  const lParts = local.split(".").map(Number);
+  const len = Math.max(rParts.length, lParts.length);
+  for (let i = 0; i < len; i++) {
+    const r = rParts[i] || 0;
+    const l = lParts[i] || 0;
+    if (r > l) return true;
+    if (r < l) return false;
+  }
+  return false;
+}
+
 export default function UpdateChecker() {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [hasUpdate, setHasUpdate] = useState(false);
@@ -18,12 +32,17 @@ export default function UpdateChecker() {
   const checkForUpdates = () => {
     setChecking(true);
     fetch("/version.json?t=" + Date.now())
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: VersionInfo) => {
         setVersionInfo(data);
-        setHasUpdate(data.version !== APP_VERSION);
+        setHasUpdate(isNewerVersion(data.version, APP_VERSION));
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.warn("Erro ao verificar atualizações:", err.message);
+      })
       .finally(() => setChecking(false));
   };
 

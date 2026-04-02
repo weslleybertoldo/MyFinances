@@ -159,7 +159,7 @@ export default function Banks() {
         {accounts.length === 0 && (
           <p className="text-muted-foreground col-span-2 text-center py-8">Nenhuma conta cadastrada. Clique em "Conectar Banco" para começar.</p>
         )}
-        {accounts.map((account: any) => (
+        {accounts.map((account) => (
           <Card key={account.id} className="overflow-hidden">
             <div className="h-1" style={{ backgroundColor: account.color }} />
             <CardHeader className="pb-2">

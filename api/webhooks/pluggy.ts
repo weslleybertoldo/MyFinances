@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
 async function syncItem(itemId: string) {
   const pluggy = new PluggyClient({
@@ -12,15 +13,22 @@ async function syncItem(itemId: string) {
   });
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-  // Find which user owns this item
-  const { data: account } = await supabase
+  // Validate item ownership — only process if a user owns this item
+  const { data: account, error: lookupError } = await supabase
     .from("accounts")
     .select("user_id")
     .eq("pluggy_item_id", itemId)
     .limit(1)
     .maybeSingle();
 
-  if (!account) return;
+  if (lookupError) {
+    throw new Error(`Erro ao verificar dono do item: ${lookupError.message}`);
+  }
+
+  if (!account) {
+    console.warn(`Webhook ignorado: item ${itemId} não pertence a nenhum usuário`);
+    return;
+  }
   const userId = account.user_id;
 
   const accountsData = await pluggy.fetchAccounts(itemId);
@@ -36,10 +44,14 @@ async function syncItem(itemId: string) {
     if (!accountDbId) continue;
 
     // Update balance
-    await supabase.from("accounts").update({
+    const { error: updateError } = await supabase.from("accounts").update({
       balance: pa.balance,
       last_sync_at: new Date().toISOString(),
     }).eq("id", accountDbId);
+
+    if (updateError) {
+      console.error(`Erro ao atualizar conta ${accountDbId}:`, updateError.message);
+    }
 
     // Sync new transactions
     const txData = await pluggy.fetchTransactions(pa.id, { pageSize: 500 });
@@ -52,7 +64,7 @@ async function syncItem(itemId: string) {
 
       if (existingTx) continue;
 
-      await supabase.from("transactions").insert({
+      const { error: insertError } = await supabase.from("transactions").insert({
         user_id: userId,
         account_id: accountDbId,
         description: pt.description || pt.descriptionRaw || "Sem descrição",
@@ -61,6 +73,10 @@ async function syncItem(itemId: string) {
         date: pt.date ? pt.date.split("T")[0] : new Date().toISOString().split("T")[0],
         pluggy_transaction_id: pt.id,
       });
+
+      if (insertError) {
+        console.error(`Erro ao inserir transação ${pt.id}:`, insertError.message);
+      }
     }
   }
 }
@@ -68,8 +84,26 @@ async function syncItem(itemId: string) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  // Validate webhook secret
+  if (!WEBHOOK_SECRET) {
+    console.error("WEBHOOK_SECRET não configurado");
+    return res.status(500).json({ error: "Webhook secret não configurado" });
+  }
+
+  const authHeader = req.headers.authorization;
+  const querySecret = req.query?.secret as string | undefined;
+  const providedSecret = authHeader?.replace("Bearer ", "") || querySecret;
+
+  if (providedSecret !== WEBHOOK_SECRET) {
+    return res.status(401).json({ error: "Não autorizado" });
+  }
+
   try {
     const event = req.body;
+
+    if (!event?.event || !event?.itemId) {
+      return res.status(400).json({ error: "Payload inválido: event e itemId obrigatórios" });
+    }
 
     switch (event.event) {
       case "item/created":
@@ -79,11 +113,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case "item/error":
         console.error("Pluggy item error:", event.itemId, event.error);
         break;
+      default:
+        console.warn("Evento desconhecido:", event.event);
     }
 
     return res.json({ received: true });
-  } catch (err: any) {
-    console.error("Webhook error:", err.message);
-    return res.json({ received: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("Webhook error:", message);
+    return res.status(500).json({ received: false, error: message });
   }
 }
