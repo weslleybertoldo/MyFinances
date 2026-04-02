@@ -1,6 +1,8 @@
 name: Build APK
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -37,6 +39,9 @@ jobs:
           CURRENT=$(node -p "require('./package.json').version")
           echo "current=$CURRENT" >> $GITHUB_OUTPUT
 
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/myfinances-release.keystore
+
       - name: Install dependencies
         run: npm ci
 
@@ -49,20 +54,23 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build APK
-        run: cd android && ./gradlew assembleDebug
+      - name: Build signed APK
+        run: cd android && ./gradlew assembleRelease
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Rename APK
         run: |
-          VERSION=${{ steps.version.outputs.current }}
-          APK=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -1)
-          mv "$APK" MyFinances-v${VERSION}.apk
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          mv "$APK" android/app/build/outputs/apk/release/MyFinances.apk
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyFinances
-          path: MyFinances-v${{ steps.version.outputs.current }}.apk
+          path: android/app/build/outputs/apk/release/MyFinances.apk
           retention-days: 30
 
       - name: Create GitHub Release
@@ -72,36 +80,26 @@ jobs:
           name: MyFinances v${{ steps.version.outputs.current }}
           body: |
             ## MyFinances v${{ steps.version.outputs.current }}
-            APK gerado automaticamente.
-            **Download:** Baixe o `MyFinances-v${{ steps.version.outputs.current }}.apk` abaixo.
-          files: MyFinances-v${{ steps.version.outputs.current }}.apk
+            APK gerado automaticamente (assinado).
+            **Download:** Baixe o `MyFinances.apk` abaixo.
+          files: android/app/build/outputs/apk/release/MyFinances.apk
           generate_release_notes: true
           make_latest: true
 
       - name: Bump version for next build
         run: |
           CURRENT=$(node -p "require('./package.json').version")
-          IFS='.' read -r MAJOR MINOR <<< "$CURRENT"
-          NEXT_MINOR=$((MINOR + 1))
-          NEXT="$MAJOR.$NEXT_MINOR"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_PATCH=$((PATCH + 1))
+          NEXT="$MAJOR.$MINOR.$NEW_PATCH"
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             pkg.version = '$NEXT';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
-          # Update version.json
-          node -e "
-            const fs = require('fs');
-            const v = JSON.parse(fs.readFileSync('public/version.json', 'utf8'));
-            v.version = '$NEXT';
-            v.apkUrl = 'https://github.com/weslleybertoldo/MyFinances/releases/download/v$NEXT/MyFinances-v$NEXT.apk';
-            fs.writeFileSync('public/version.json', JSON.stringify(v, null, 2) + '\n');
-          "
-          # Update UpdateChecker
-          sed -i "s/const APP_VERSION = \"[^\"]*\"/const APP_VERSION = \"$NEXT\"/" src/components/UpdateChecker.tsx
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json public/version.json src/components/UpdateChecker.tsx
+          git add package.json
           git diff --staged --quiet || git commit -m "chore: bump version to v$NEXT [skip ci]"
           git push
