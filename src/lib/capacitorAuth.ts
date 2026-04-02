@@ -1,11 +1,8 @@
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
-import { App } from "@capacitor/app";
 import { supabase } from "@/lib/supabase";
 
 const isNative = Capacitor.isNativePlatform();
-const REDIRECT_SCHEME = "com.weslley.myfinances";
-const REDIRECT_URL = `${REDIRECT_SCHEME}://login-callback`;
 
 export async function signInWithGoogle(): Promise<{ error?: string }> {
   if (!isNative) {
@@ -17,11 +14,13 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
     return {};
   }
 
+  // Nativo: abre browser e retorna imediatamente
+  // O appStateChange no AuthContext detecta a sessão quando voltar
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: REDIRECT_URL,
+        redirectTo: "https://myfinances-app.vercel.app",
         skipBrowserRedirect: true,
       },
     });
@@ -30,79 +29,13 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
       return { error: error?.message || "Erro ao iniciar login" };
     }
 
-    const sessionPromise = new Promise<{ error?: string }>((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve({ error: "Login cancelado ou expirado" });
-      }, 120000);
-
-      const listenerHandle = App.addListener("appUrlOpen", async ({ url }) => {
-        if (!url.startsWith(REDIRECT_SCHEME)) return;
-        clearTimeout(timeout);
-
-        try {
-          // Extrai tokens da URL (fragment ou query)
-          const hashPart = url.includes("#") ? url.split("#")[1] : url.split("?")[1];
-          if (!hashPart) {
-            resolve({ error: "Resposta de login inválida" });
-            return;
-          }
-
-          const params = new URLSearchParams(hashPart);
-          const accessToken = params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-
-          if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (sessionError) {
-              resolve({ error: sessionError.message });
-            } else {
-              // Força buscar sessão atualizada (dispara onAuthStateChange)
-              await supabase.auth.getUser();
-              resolve({});
-            }
-          } else {
-            const errorDesc = params.get("error_description") || params.get("error");
-            resolve({ error: errorDesc || "Tokens não recebidos" });
-          }
-        } catch {
-          resolve({ error: "Erro ao processar login" });
-        }
-
-        try { await Browser.close(); } catch {}
-        listenerHandle.remove();
-      });
-    });
-
     await Browser.open({ url: data.url, windowName: "_self" });
-    return await sessionPromise;
+    return {};
   } catch {
     return { error: "Erro ao abrir login do Google" };
   }
 }
 
 export function setupDeepLinkListener() {
-  if (!isNative) return;
-
-  App.addListener("appUrlOpen", async ({ url }) => {
-    if (url.startsWith(REDIRECT_SCHEME) && url.includes("access_token")) {
-      const hashPart = url.includes("#") ? url.split("#")[1] : url.split("?")[1];
-      if (!hashPart) return;
-
-      const params = new URLSearchParams(hashPart);
-      const accessToken = params.get("access_token");
-      const refreshToken = params.get("refresh_token");
-
-      if (accessToken && refreshToken) {
-        await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        try { await Browser.close(); } catch {}
-      }
-    }
-  });
+  // Não precisa mais — appStateChange cuida de tudo
 }

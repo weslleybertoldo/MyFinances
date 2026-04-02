@@ -230,22 +230,12 @@ export default function FutureLaunches() {
   return (
     <div className="space-y-6">
       {/* Header com navegação de mês */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Lançamentos Futuros</h1>
-          <p className="text-muted-foreground">Previsão de gastos e receitas</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={prevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium min-w-[140px] text-center">{getMonthLabel(selectedMonth)}</span>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={nextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Lançamentos</h1>
           <Dialog open={showAdd} onOpenChange={setShowAdd}>
             <DialogTrigger asChild>
-              <Button className="ml-2"><Plus className="h-4 w-4 mr-2" />Novo Lançamento</Button>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Novo</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -289,10 +279,19 @@ export default function FutureLaunches() {
             </DialogContent>
           </Dialog>
         </div>
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={prevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium min-w-[120px] text-center">{getMonthLabel(selectedMonth)}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={nextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Cards resumo */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 mb-1">

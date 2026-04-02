@@ -14,9 +14,9 @@ export default function Auth() {
     setError("");
     setLoading(true);
     const { error } = await signInWithGoogle();
+    setLoading(false);
     if (error) {
       setError(error);
-      setLoading(false);
     }
   };
 
