@@ -4,6 +4,14 @@ const config: CapacitorConfig = {
   appId: 'com.weslley.myfinances',
   appName: 'MyFinances',
   webDir: 'dist',
+  android: {
+    webContentsDebuggingEnabled: false,
+    allowMixedContent: true,
+  },
+  server: {
+    cleartext: true,
+    androidScheme: 'https',
+  },
 };
 
 export default config;
