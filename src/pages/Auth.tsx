@@ -1,72 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw } from "lucide-react";
 import { CURRENT_VERSION } from "@/components/UpdateChecker";
-import { supabase } from "@/lib/supabase";
-import { Capacitor } from "@capacitor/core";
 
 export default function Auth() {
   const { signInWithGoogle } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-
-  const addLog = (msg: string) => {
-    setDebugLog((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
-  };
-
-  useEffect(() => {
-    addLog(`Plataforma: ${Capacitor.isNativePlatform() ? "NATIVO" : "WEB"}`);
-    addLog(`Platform: ${Capacitor.getPlatform()}`);
-
-    // Verifica sessão existente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        addLog(`Sessão encontrada: ${session.user.email}`);
-      } else {
-        addLog("Sem sessão");
-      }
-    });
-  }, []);
-
-  // Polling: verifica sessão quando volta do browser
-  useEffect(() => {
-    if (!loading) return;
-    const interval = setInterval(async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        addLog(`LOGIN OK: ${session.user.email}`);
-        setLoading(false);
-        clearInterval(interval);
-        window.location.reload();
-      }
-    }, 1500);
-    return () => clearInterval(interval);
-  }, [loading]);
 
   const handleGoogle = async () => {
     setError("");
     setLoading(true);
-    addLog("Iniciando login Google...");
-
     const { error } = await signInWithGoogle();
-
     if (error) {
-      addLog(`ERRO: ${error}`);
       setError(error);
       setLoading(false);
-    } else {
-      addLog("signInWithGoogle retornou sem erro");
-      // Verifica sessão
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        addLog(`Sessão ativa: ${session.user.email}`);
-        window.location.reload();
-      } else {
-        addLog("Sessão ainda não ativa, aguardando polling...");
-      }
     }
   };
 
@@ -88,17 +38,6 @@ export default function Auth() {
             {loading ? "Entrando..." : "Entrar com Google"}
           </Button>
           {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-
-          {/* Debug log visual */}
-          {debugLog.length > 0 && (
-            <div className="bg-muted rounded p-2 max-h-40 overflow-y-auto">
-              <p className="text-[10px] font-medium mb-1">Debug:</p>
-              {debugLog.map((log, i) => (
-                <p key={i} className="text-[9px] text-muted-foreground font-mono">{log}</p>
-              ))}
-            </div>
-          )}
-
           <p className="text-xs text-muted-foreground text-center">Acesso restrito</p>
         </CardContent>
       </Card>

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, useRef, type ReactNode 
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { signInWithGoogle as capacitorSignIn } from "@/lib/capacitorAuth";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
 
 const ALLOWED_EMAIL = "weslleybertoldo18@gmail.com";
 
@@ -52,6 +54,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signingOut = useRef(false);
 
   useEffect(() => {
+    // No Capacitor, verificar sessão quando app volta pro foreground (após login Google)
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener("appStateChange", async ({ isActive }) => {
+        if (isActive && !user) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const email = session.user.email?.toLowerCase();
+            if (email === ALLOWED_EMAIL) {
+              setSession(session);
+              setUser(session.user);
+              seedCategories(session.user.id);
+            }
+          }
+        }
+      });
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const email = session.user.email?.toLowerCase();
