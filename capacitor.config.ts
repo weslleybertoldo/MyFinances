@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'MyFinances',
   webDir: 'dist',
   android: {
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: true,
     allowMixedContent: true,
   },
   server: {
