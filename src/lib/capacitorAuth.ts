@@ -40,6 +40,7 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
         clearTimeout(timeout);
 
         try {
+          // Extrai tokens da URL (fragment ou query)
           const hashPart = url.includes("#") ? url.split("#")[1] : url.split("?")[1];
           if (!hashPart) {
             resolve({ error: "Resposta de login inválida" });
@@ -55,7 +56,14 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
               access_token: accessToken,
               refresh_token: refreshToken,
             });
-            resolve(sessionError ? { error: sessionError.message } : {});
+
+            if (sessionError) {
+              resolve({ error: sessionError.message });
+            } else {
+              // Força buscar sessão atualizada (dispara onAuthStateChange)
+              await supabase.auth.getUser();
+              resolve({});
+            }
           } else {
             const errorDesc = params.get("error_description") || params.get("error");
             resolve({ error: errorDesc || "Tokens não recebidos" });

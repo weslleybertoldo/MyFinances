@@ -1,26 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RefreshCw } from "lucide-react";
+import { CURRENT_VERSION } from "@/components/UpdateChecker";
+import { supabase } from "@/lib/supabase";
+import { Capacitor } from "@capacitor/core";
 
 export default function Auth() {
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, user } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // No Capacitor, verificar sessão quando o app retorna do browser
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const interval = setInterval(async () => {
+      if (loading) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setLoading(false);
+          window.location.reload();
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handleGoogle = async () => {
     setError("");
     setLoading(true);
     const { error } = await signInWithGoogle();
-    setLoading(false);
-    if (error) setError(error);
+    if (error) {
+      setError(error);
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">FinControl</CardTitle>
+          <CardTitle className="text-2xl">MyFinances</CardTitle>
           <CardDescription>Controle financeiro pessoal</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -37,6 +60,17 @@ export default function Auth() {
           <p className="text-xs text-muted-foreground text-center">Acesso restrito</p>
         </CardContent>
       </Card>
+
+      <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-2">
+        <p className="text-xs text-muted-foreground/50">v{CURRENT_VERSION}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          <RefreshCw className="h-3 w-3" />
+          Verificar atualizações
+        </button>
+      </div>
     </div>
   );
 }
