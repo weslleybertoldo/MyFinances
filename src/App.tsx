@@ -15,10 +15,19 @@ import Banks from "@/pages/Banks";
 import Auth from "@/pages/Auth";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
+import { setupDeepLinkListener } from "@/lib/capacitorAuth";
+
+// Setup deep link listener IMEDIATAMENTE no boot (antes do React render)
+setupDeepLinkListener();
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 60_000 },
+    queries: {
+      staleTime: 60_000,
+      gcTime: 1000 * 60 * 10,
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+    },
   },
 });
 

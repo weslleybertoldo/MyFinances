@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { signInWithGoogle as capacitorSignIn, setupDeepLinkListener } from "@/lib/capacitorAuth";
+import { signInWithGoogle as capacitorSignIn } from "@/lib/capacitorAuth";
 
 const ALLOWED_EMAIL = "weslleybertoldo18@gmail.com";
 
@@ -52,9 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signingOut = useRef(false);
 
   useEffect(() => {
-    // Setup deep link listener para Capacitor
-    setupDeepLinkListener();
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const email = session.user.email?.toLowerCase();
