@@ -73,8 +73,15 @@ export default function FutureLaunches() {
   const futureTotal = futureLaunches.filter((l) => l.type === "expense" && !l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
 
   // Month totals
-  const monthIncome = monthLaunches.filter((l) => l.type === "income" && !l.paid).reduce((s, l) => s + l.amount, 0);
+  // Receitas Previstas = receitas já pagas - despesas já pagas (saldo real do mês)
+  const incomePaidItems = monthLaunches.filter((l) => l.type === "income" && l.paid);
+  const expensePaidItems = monthLaunches.filter((l) => l.type === "expense" && l.paid);
+  const monthIncomePaid = incomePaidItems.reduce((s, l) => s + Math.abs(l.amount), 0);
+  const monthExpensePaid = expensePaidItems.reduce((s, l) => s + Math.abs(l.amount), 0);
+  const monthIncome = Math.max(0, monthIncomePaid - monthExpensePaid);
+  // Despesas Previstas = despesas ainda não pagas
   const monthExpense = monthLaunches.filter((l) => l.type === "expense" && !l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
+
 
   // Forecast for selected month
   const sortedMonth = [...monthLaunches].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
