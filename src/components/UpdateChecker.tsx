@@ -26,9 +26,11 @@ export default function UpdateChecker() {
   const [update, setUpdate] = useState<VersionInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [justChecked, setJustChecked] = useState(false);
 
   const checkUpdate = async () => {
     setChecking(true);
+    setJustChecked(false);
     try {
       const res = await fetch(RELEASES_URL, { cache: "no-store" });
       if (!res.ok) return;
@@ -46,9 +48,13 @@ export default function UpdateChecker() {
           download_url: apkAsset?.browser_download_url || release.html_url,
         });
         setDismissed(false);
+      } else {
+        setUpdate(null);
+        setJustChecked(true);
+        setTimeout(() => setJustChecked(false), 3000);
       }
     } catch {
-      // sem internet — ignora
+      // sem internet
     } finally {
       setChecking(false);
     }
@@ -58,11 +64,10 @@ export default function UpdateChecker() {
     checkUpdate();
   }, []);
 
-  // Notificação flutuante quando tem atualização
+  // Card flutuante quando tem atualização
   if (update && !dismissed) {
     return (
       <>
-        {/* Card flutuante */}
         <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md">
           <div className="bg-card border border-blue-300 dark:border-blue-700 rounded-xl p-4 shadow-lg">
             <div className="flex items-start justify-between gap-3">
@@ -87,7 +92,6 @@ export default function UpdateChecker() {
             </a>
           </div>
         </div>
-        {/* Rodapé */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Download className="h-3.5 w-3.5 text-blue-600" />
@@ -98,12 +102,15 @@ export default function UpdateChecker() {
     );
   }
 
-  // Rodapé normal — versão atual
+  // Rodapé normal
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-        <span className="text-xs text-muted-foreground">v{CURRENT_VERSION}</span>
+        <span className="text-xs text-muted-foreground">
+          v{CURRENT_VERSION}
+          {justChecked && <span className="text-green-600 ml-1">— Versão atual!</span>}
+        </span>
       </div>
       <button
         onClick={checkUpdate}
@@ -111,7 +118,7 @@ export default function UpdateChecker() {
         className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
       >
         <RefreshCw className={`h-3 w-3 ${checking ? "animate-spin" : ""}`} />
-        {checking ? "..." : "Verificar"}
+        {checking ? "Verificando..." : "Verificar"}
       </button>
     </div>
   );
