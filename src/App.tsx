@@ -13,6 +13,7 @@ import Transactions from "@/pages/Transactions";
 import FutureLaunches from "@/pages/FutureLaunches";
 import Banks from "@/pages/Banks";
 import Auth from "@/pages/Auth";
+import Projects from "@/pages/Projects";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 import { setupDeepLinkListener } from "@/lib/capacitorAuth";
@@ -52,6 +53,7 @@ const App = () => (
                           <Route path="/" element={<Dashboard />} />
                           <Route path="/transacoes" element={<Transactions />} />
                           <Route path="/lancamentos" element={<FutureLaunches />} />
+                          <Route path="/projetos" element={<Projects />} />
                           <Route path="/bancos" element={<Banks />} />
                           <Route path="/configuracoes" element={<Settings />} />
                           <Route path="*" element={<NotFound />} />
