@@ -421,35 +421,35 @@ export default function FutureLaunches() {
       </div>
 
       {/* Cards resumo */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-success" />
-              <p className="text-xs text-muted-foreground">Receitas Previstas</p>
+          <CardContent className="pt-3 px-3">
+            <div className="flex items-center gap-1 mb-1">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-success flex-shrink-0" />
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Receitas Previstas</p>
             </div>
-            <p className="text-lg font-bold text-success">{formatCurrency(monthIncome)}</p>
+            <p className="text-base sm:text-lg font-bold text-success">{formatCurrency(monthIncome)}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="h-4 w-4 text-destructive" />
-              <p className="text-xs text-muted-foreground">Despesas Previstas</p>
+          <CardContent className="pt-3 px-3">
+            <div className="flex items-center gap-1 mb-1">
+              <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-destructive flex-shrink-0" />
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Despesas Previstas</p>
             </div>
-            <p className="text-lg font-bold text-destructive">{formatCurrency(monthExpense)}</p>
+            <p className="text-base sm:text-lg font-bold text-destructive">{formatCurrency(monthExpense)}</p>
           </CardContent>
         </Card>
         <Card
           className="cursor-pointer hover:shadow-md transition-shadow border-amber-200 dark:border-amber-800"
           onClick={() => setShowPending(true)}
         >
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              <p className="text-xs text-muted-foreground">Pendentes</p>
+          <CardContent className="pt-3 px-3">
+            <div className="flex items-center gap-1 mb-1">
+              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500 flex-shrink-0" />
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Pendentes</p>
             </div>
-            <p className="text-lg font-bold text-amber-500">{formatCurrency(pendingTotal)}</p>
+            <p className="text-base sm:text-lg font-bold text-amber-500">{formatCurrency(pendingTotal)}</p>
             <p className="text-[10px] text-muted-foreground">{pendingLaunches.length} em atraso</p>
           </CardContent>
         </Card>
@@ -457,22 +457,22 @@ export default function FutureLaunches() {
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setShowFuture(true)}
         >
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarClock className="h-4 w-4 text-blue-500" />
-              <p className="text-xs text-muted-foreground">Futuras</p>
+          <CardContent className="pt-3 px-3">
+            <div className="flex items-center gap-1 mb-1">
+              <CalendarClock className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" />
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Futuras</p>
             </div>
-            <p className="text-lg font-bold text-blue-500">{formatCurrency(futureTotal)}</p>
+            <p className="text-base sm:text-lg font-bold text-blue-500">{formatCurrency(futureTotal)}</p>
             <p className="text-[10px] text-muted-foreground">Próximos meses</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarClock className="h-4 w-4 text-primary" />
-              <p className="text-xs text-muted-foreground">Saldo Projetado</p>
+          <CardContent className="pt-3 px-3">
+            <div className="flex items-center gap-1 mb-1">
+              <CalendarClock className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Saldo Projetado</p>
             </div>
-            <p className={`text-lg font-bold ${projectedBalance >= 0 ? "text-success" : "text-destructive"}`}>
+            <p className={`text-base sm:text-lg font-bold ${projectedBalance >= 0 ? "text-success" : "text-destructive"}`}>
               {formatCurrency(projectedBalance)}
             </p>
           </CardContent>
@@ -601,7 +601,7 @@ export default function FutureLaunches() {
                       <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Descrição" />
                       <Input type="number" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} placeholder="Valor" />
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
                       <Select value={editForm.categoryId} onValueChange={(v) => setEditForm({ ...editForm, categoryId: v })}>
                         <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
@@ -634,7 +634,7 @@ export default function FutureLaunches() {
                       </button>
                       <div className="min-w-0">
                         <p className={`font-medium text-sm ${l.paid ? "line-through" : ""}`}>{l.description}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground">
                           <span>{formatDueDate(l.dueDate)}</span>
                           <Badge variant="secondary" className="text-[10px]">{l.category}</Badge>
                           {l.recurring && <Badge variant="outline" className="text-[10px]">Recorrente</Badge>}
