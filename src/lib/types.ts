@@ -35,6 +35,7 @@ export interface FutureLaunch {
   groupId: string | null;
   parcelNumber: number | null;
   totalParcels: number | null;
+  cardId: string | null;
 }
 
 export interface Category {
@@ -42,4 +43,13 @@ export interface Category {
   name: string;
   color: string;
   type: "income" | "expense" | "both";
+}
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  closingDay: number;
+  dueDay: number;
+  color: string;
+  limit: number;
 }

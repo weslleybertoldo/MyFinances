@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, CalendarClock, TrendingUp, TrendingDown, Check, AlertTriangle, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, CalendarClock, TrendingUp, TrendingDown, Check, AlertTriangle, Pencil, ChevronLeft, ChevronRight, CreditCard, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
-import { useFutureLaunches, useCreateFutureLaunch, useUpdateFutureLaunch, useUpdateFutureLaunchGroup, useDeleteFutureLaunch, useDeleteFutureLaunchGroup } from "@/hooks/useFutureLaunches";
+import { useFutureLaunches, useCreateFutureLaunch, useUpdateFutureLaunch, useUpdateFutureLaunchGroup, useDeleteFutureLaunch, useDeleteFutureLaunchGroup, useClearCardFromGroup } from "@/hooks/useFutureLaunches";
 import { useTotalBalance } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
+import { useCreditCards, useInvoicePayments, useToggleInvoicePayment } from "@/hooks/useCreditCards";
 import DashboardPendingModal from "@/components/DashboardPendingModal";
 import DashboardFutureModal from "@/components/DashboardFutureModal";
 
@@ -31,10 +32,14 @@ export default function FutureLaunches() {
   const { data: categories = [] } = useCategories();
   const currentBalance = useTotalBalance();
   const createLaunch = useCreateFutureLaunch();
+  const { data: creditCards = [] } = useCreditCards();
+  const { data: invoicePayments = [] } = useInvoicePayments();
+  const toggleInvoicePayment = useToggleInvoicePayment();
   const updateLaunch = useUpdateFutureLaunch();
   const deleteLaunch = useDeleteFutureLaunch();
   const deleteGroup = useDeleteFutureLaunchGroup();
   const updateGroup = useUpdateFutureLaunchGroup();
+  const clearCardFromGroup = useClearCardFromGroup();
 
   const [selectedMonth, setSelectedMonth] = useState(() => getMonthStr(new Date()));
   const currentMonthStr = getMonthStr(new Date());
@@ -43,9 +48,13 @@ export default function FutureLaunches() {
   const [showPending, setShowPending] = useState(false);
   const [showFuture, setShowFuture] = useState(false);
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ id: string; groupId: string } | null>(null);
+  const [confirmDeleteSingle, setConfirmDeleteSingle] = useState<string | null>(null);
   const [confirmUpdateGroup, setConfirmUpdateGroup] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ description: "", amount: "", dueDate: "", categoryId: "", type: "expense" as "income" | "expense", recurring: false });
+  const [payDialog, setPayDialog] = useState<{ id: string; groupId: string | null } | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string>("");
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   const [newLaunch, setNewLaunch] = useState({
     description: "",
@@ -55,6 +64,7 @@ export default function FutureLaunches() {
     type: "expense" as "income" | "expense",
     recurring: false,
     installments: "",
+    cardId: "",
   });
 
   // Filter by selected month
@@ -74,14 +84,64 @@ export default function FutureLaunches() {
   const futureTotal = futureLaunches.filter((l) => l.type === "expense" && !l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
 
   // Month totals
-  // Receitas Previstas = receitas já pagas - despesas já pagas (saldo real do mês)
+  // Receitas Previstas = receitas já pagas - despesas pagas com SALDO (sem cartão) - faturas de cartão pagas neste mês
   const incomePaidItems = monthLaunches.filter((l) => l.type === "income" && l.paid);
-  const expensePaidItems = monthLaunches.filter((l) => l.type === "expense" && l.paid);
+  const expensePaidWithBalance = monthLaunches.filter((l) => l.type === "expense" && l.paid && !l.cardId);
   const monthIncomePaid = incomePaidItems.reduce((s, l) => s + Math.abs(l.amount), 0);
-  const monthExpensePaid = expensePaidItems.reduce((s, l) => s + Math.abs(l.amount), 0);
-  const monthIncome = Math.max(0, monthIncomePaid - monthExpensePaid);
+  const monthExpensePaidBalance = expensePaidWithBalance.reduce((s, l) => s + Math.abs(l.amount), 0);
+  // Soma das faturas de cartão pagas que vencem neste mês
+  const paidInvoicesThisMonth = invoicePayments
+    .filter((p) => p.month === selectedMonth)
+    .reduce((s, p) => s + p.amount, 0);
+  const monthIncome = Math.max(0, monthIncomePaid - monthExpensePaidBalance - paidInvoicesThisMonth);
   // Despesas Previstas = despesas ainda não pagas
   const monthExpense = monthLaunches.filter((l) => l.type === "expense" && !l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
+
+  // Calcula o mês de VENCIMENTO da fatura para uma despesa
+  // Ex: closingDay=29, dueDay=5 → compra dia 2/abr (antes do fechamento 29/abr) → fatura vence 5/mai → mês "2026-05"
+  // Ex: compra dia 30/abr (depois do fechamento 29/abr) → fatura vence 5/jun → mês "2026-06"
+  const getInvoiceMonth = (expenseDate: string, closingDay: number) => {
+    const [y, m, d] = expenseDate.split("-").map(Number);
+    if (d <= closingDay) {
+      // Fecha este mês → vence no próximo
+      const dt = new Date(y, m, 1); // m já é 1-based, new Date(y, m, 1) = próximo mês
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+    } else {
+      // Fecha no próximo mês → vence 2 meses depois
+      const dt = new Date(y, m + 1, 1);
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+    }
+  };
+
+  // Próximo mês a partir do selecionado
+  const getNextMonth = (monthStr: string) => {
+    const [y, m] = monthStr.split("-").map(Number);
+    const dt = new Date(y, m, 1); // m é 1-based, então new Date(y, m, 1) = próximo mês
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const nextMonthStr = getNextMonth(selectedMonth);
+
+  // Faturas por cartão — fatura principal (vence no mês selecionado)
+  const cardInvoices = creditCards.map((card) => {
+    const cardLaunches = allLaunches.filter((l) => {
+      if (l.cardId !== card.id || l.type !== "expense") return false;
+      return getInvoiceMonth(l.dueDate, card.closingDay) === selectedMonth;
+    });
+    const total = cardLaunches.reduce((s, l) => s + Math.abs(l.amount), 0);
+    const allPaid = cardLaunches.length > 0 && cardLaunches.every((l) => l.paid);
+    const hasPending = cardLaunches.some((l) => !l.paid);
+    return { card, launches: cardLaunches, total, allPaid, hasPending };
+  }).filter((inv) => inv.total > 0 || inv.launches.length > 0);
+
+  // Preview da PRÓXIMA fatura (vence no mês seguinte ao selecionado) — só visualização
+  const cardInvoicePreviews = creditCards.map((card) => {
+    const cardLaunches = allLaunches.filter((l) => {
+      if (l.cardId !== card.id || l.type !== "expense") return false;
+      return getInvoiceMonth(l.dueDate, card.closingDay) === nextMonthStr;
+    });
+    const total = cardLaunches.reduce((s, l) => s + Math.abs(l.amount), 0);
+    return { card, launches: cardLaunches, total };
+  }).filter((inv) => inv.total > 0);
 
 
   // Forecast for selected month
@@ -105,7 +165,58 @@ export default function FutureLaunches() {
   };
 
   const togglePaid = (id: string, currentPaid: boolean) => {
-    updateLaunch.mutate({ id, paid: !currentPaid });
+    if (currentPaid) {
+      const launch = allLaunches.find((l) => l.id === id);
+      // Desmarcar — limpa paid e card_id
+      updateLaunch.mutate({ id, paid: false, card_id: null });
+      // Se tinha card_id e grupo, limpa card_id das parcelas futuras não pagas do grupo
+      if (launch?.cardId && launch?.groupId) {
+        clearCardFromGroup.mutate({ groupId: launch.groupId });
+      }
+      return;
+    }
+    // Marcar como pago
+    const launch = allLaunches.find((l) => l.id === id);
+    if (!launch) return;
+    // Receita → marca direto
+    if (launch.type === "income") {
+      updateLaunch.mutate({ id, paid: true });
+      return;
+    }
+    // Despesa → abre dialog Saldo/Cartão (só se tem cartões cadastrados)
+    if (creditCards.length > 0) {
+      setSelectedCardId("");
+      setPayDialog({ id, groupId: launch.groupId });
+    } else {
+      // Sem cartões → paga com saldo direto
+      updateLaunch.mutate({ id, paid: true });
+    }
+  };
+
+  const handlePayWithBalance = () => {
+    if (!payDialog) return;
+    updateLaunch.mutate({ id: payDialog.id, paid: true, card_id: null });
+    setPayDialog(null);
+  };
+
+  const handlePayWithCard = () => {
+    if (!payDialog || !selectedCardId) return;
+    // Marca APENAS esta despesa como paga com o cartão (não propaga para grupo)
+    updateLaunch.mutate({ id: payDialog.id, paid: true, card_id: selectedCardId });
+    setPayDialog(null);
+  };
+
+  const isInvoicePaid = (cardId: string, month: string) => {
+    return invoicePayments.some((p) => p.cardId === cardId && p.month === month);
+  };
+
+  const handleToggleInvoice = (cardId: string, month: string, total: number) => {
+    toggleInvoicePayment.mutate({
+      cardId,
+      month,
+      amount: total,
+      currentlyPaid: isInvoicePaid(cardId, month),
+    });
   };
 
   const handleAdd = () => {
@@ -117,10 +228,11 @@ export default function FutureLaunches() {
       type: newLaunch.type,
       due_date: newLaunch.dueDate,
       category_id: newLaunch.categoryId || undefined,
+      card_id: (newLaunch.cardId && newLaunch.cardId !== "none") ? newLaunch.cardId : undefined,
       recurring: installments ? false : newLaunch.recurring,
       installments,
     });
-    setNewLaunch({ description: "", amount: "", dueDate: "", categoryId: "", type: "expense", recurring: false, installments: "" });
+    setNewLaunch({ description: "", amount: "", dueDate: "", categoryId: "", type: "expense", recurring: false, installments: "", cardId: "" });
     setShowAdd(false);
   };
 
@@ -151,7 +263,7 @@ export default function FutureLaunches() {
     doSaveEdit(false);
   };
 
-  const doSaveEdit = (updateAllParcels: boolean) => {
+  const doSaveEdit = async (updateAllParcels: boolean) => {
     if (!editingId) return;
     const launch = allLaunches.find((l) => l.id === editingId);
 
@@ -177,7 +289,7 @@ export default function FutureLaunches() {
         const day = String(Math.min(newDay, lastDay)).padStart(2, "0");
         return supabase.from("future_launches").update({ due_date: `${sy}-${sm}-${day}` }).eq("id", s.id);
       });
-      Promise.all(dateUpdates);
+      await Promise.all(dateUpdates);
 
       // Atualiza a data desta parcela individualmente
       updateLaunch.mutate({ id: editingId, due_date: editForm.dueDate });
@@ -202,7 +314,7 @@ export default function FutureLaunches() {
     if (l.groupId) {
       setConfirmDeleteGroup({ id: l.id, groupId: l.groupId });
     } else {
-      deleteLaunch.mutate(l.id);
+      setConfirmDeleteSingle(l.id);
     }
   };
 
@@ -271,6 +383,24 @@ export default function FutureLaunches() {
                     <Checkbox checked={newLaunch.recurring} onCheckedChange={(v) => setNewLaunch({ ...newLaunch, recurring: !!v })} />
                     <span className="text-sm">Recorrente (mensal)</span>
                   </div>
+                )}
+                {newLaunch.type === "expense" && creditCards.length > 0 && (
+                  <Select value={newLaunch.cardId} onValueChange={(v) => setNewLaunch({ ...newLaunch, cardId: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sem cartão (saldo)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem cartão (saldo)</SelectItem>
+                      {creditCards.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                            {c.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
                 <Button className="w-full" onClick={handleAdd} disabled={createLaunch.isPending}>
                   {createLaunch.isPending ? "Adicionando..." : "Adicionar"}
@@ -349,6 +479,100 @@ export default function FutureLaunches() {
         </Card>
       </div>
 
+      {/* Cards de fatura dos cartões */}
+      {cardInvoices.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground">Faturas dos Cartões</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {cardInvoices.map(({ card, launches: cardLaunches, total }) => {
+              const paid = isInvoicePaid(card.id, selectedMonth);
+              // Limite = limite - todas as despesas em faturas NÃO pagas
+              const totalUsed = allLaunches
+                .filter((l) => {
+                  if (l.cardId !== card.id || l.type !== "expense") return false;
+                  const invMonth = getInvoiceMonth(l.dueDate, card.closingDay);
+                  return !isInvoicePaid(card.id, invMonth);
+                })
+                .reduce((s, l) => s + Math.abs(l.amount), 0);
+              const availableLimit = card.limit > 0 ? card.limit - totalUsed : 0;
+              return (
+                <Card
+                  key={card.id}
+                  className={`cursor-pointer hover:shadow-md transition-shadow ${paid ? "opacity-60" : ""}`}
+                  style={{ borderLeftColor: card.color, borderLeftWidth: 4 }}
+                  onClick={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
+                >
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleToggleInvoice(card.id, selectedMonth, total); }}
+                          className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${paid ? "bg-success border-success" : "border-muted-foreground/30 hover:border-success/50"}`}
+                        >
+                          {paid && <Check className="h-3.5 w-3.5 text-success-foreground" />}
+                        </button>
+                        <CreditCard className="h-4 w-4" style={{ color: card.color }} />
+                        <span className={`font-medium text-sm ${paid ? "line-through" : ""}`}>{card.name}</span>
+                      </div>
+                      <Badge variant={paid ? "default" : "secondary"} className="text-[10px]">
+                        {paid ? "Paga" : "Aberta"}
+                      </Badge>
+                    </div>
+                    <p className={`text-lg font-bold ${paid ? "line-through" : ""}`}>{formatCurrency(total)}</p>
+                    <p className="text-[10px] text-muted-foreground">Vence dia {card.dueDay}</p>
+                    {card.limit > 0 && (
+                      <div className="mt-2 pt-2 border-t border-dashed">
+                        <p className="text-xs text-muted-foreground">Disponível</p>
+                        <p className={`text-sm font-semibold ${availableLimit >= 0 ? "text-success" : "text-destructive"}`}>
+                          {formatCurrency(availableLimit)}
+                        </p>
+                      </div>
+                    )}
+
+                    {expandedCard === card.id && (
+                      <div className="mt-3 pt-3 border-t space-y-1">
+                        {cardLaunches.map((cl) => (
+                          <div key={cl.id} className="flex justify-between text-xs">
+                            <span>
+                              {cl.description}
+                              {cl.totalParcels && <span className="text-muted-foreground ml-1">{cl.parcelNumber}/{cl.totalParcels}</span>}
+                            </span>
+                            <span className="text-destructive">{formatCurrency(Math.abs(cl.amount))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Preview da próxima fatura (pequeno, só visualização) */}
+      {cardInvoicePreviews.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-medium text-muted-foreground">Próxima fatura ({getMonthLabel(nextMonthStr)})</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {cardInvoicePreviews.map(({ card, total, launches: previewLaunches }) => (
+              <div
+                key={card.id}
+                className="flex items-center gap-2 p-2 rounded-md border border-dashed opacity-70"
+                style={{ borderColor: card.color }}
+              >
+                <CreditCard className="h-3 w-3 flex-shrink-0" style={{ color: card.color }} />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium truncate">{card.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatCurrency(total)} · {previewLaunches.length} {previewLaunches.length === 1 ? "item" : "itens"}</p>
+                  <p className="text-[9px] text-muted-foreground">Vence {card.dueDay}/{nextMonthStr.split("-")[1]}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Lista de lançamentos do mês */}
       <Card>
         <CardHeader>
@@ -417,6 +641,14 @@ export default function FutureLaunches() {
                           {l.totalParcels && (
                             <Badge variant="outline" className="text-[10px]">{l.parcelNumber}/{l.totalParcels}</Badge>
                           )}
+                          {l.cardId && (() => {
+                            const card = creditCards.find((c) => c.id === l.cardId);
+                            return card ? (
+                              <Badge variant="outline" className="text-[10px]" style={{ borderColor: card.color, color: card.color }}>
+                                <CreditCard className="h-2.5 w-2.5 mr-0.5" />{card.name}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -446,6 +678,24 @@ export default function FutureLaunches() {
       <DashboardPendingModal open={showPending} onOpenChange={setShowPending} launches={pendingLaunches} />
       <DashboardFutureModal open={showFuture} onOpenChange={setShowFuture} launches={futureLaunches} />
 
+      {/* Dialog de confirmação para deletar lançamento avulso */}
+      <Dialog open={!!confirmDeleteSingle} onOpenChange={() => setConfirmDeleteSingle(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Excluir lançamento?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Deseja realmente apagar este lançamento?
+          </p>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmDeleteSingle(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => { deleteLaunch.mutate(confirmDeleteSingle!); setConfirmDeleteSingle(null); }}>Excluir</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Dialog de confirmação para deletar grupo */}
       <Dialog open={!!confirmDeleteGroup} onOpenChange={() => setConfirmDeleteGroup(null)}>
         <DialogContent>
@@ -476,6 +726,57 @@ export default function FutureLaunches() {
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => { doSaveEdit(false); }} disabled={updateLaunch.isPending || updateGroup.isPending}>Só esta</Button>
             <Button onClick={() => { doSaveEdit(true); }} disabled={updateLaunch.isPending || updateGroup.isPending}>Atualizar todas</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog Saldo ou Cartão */}
+      <Dialog open={!!payDialog} onOpenChange={(open) => { if (!open) { setPayDialog(null); setSelectedCardId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Como foi pago?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={handlePayWithBalance}>
+              <Wallet className="h-5 w-5 text-success" />
+              <div className="text-left">
+                <p className="font-medium text-sm">Saldo</p>
+                <p className="text-[10px] text-muted-foreground">Desconta das Receitas Previstas</p>
+              </div>
+            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className={`w-full justify-start gap-3 h-12 ${selectedCardId ? "border-primary" : ""}`}
+                onClick={() => { if (creditCards.length === 1) { setSelectedCardId(creditCards[0].id); } }}
+                disabled={creditCards.length === 0}
+              >
+                <CreditCard className="h-5 w-5 text-purple-500" />
+                <div className="text-left">
+                  <p className="font-medium text-sm">Cartão de Crédito</p>
+                  <p className="text-[10px] text-muted-foreground">Vai para a fatura do cartão</p>
+                </div>
+              </Button>
+              {creditCards.length > 0 && (
+                <Select value={selectedCardId} onValueChange={setSelectedCardId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o cartão" /></SelectTrigger>
+                  <SelectContent>
+                    {creditCards.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                          {c.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedCardId && (
+                <Button className="w-full" onClick={handlePayWithCard}>
+                  Confirmar Pagamento no Cartão
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

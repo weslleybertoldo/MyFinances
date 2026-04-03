@@ -134,6 +134,7 @@ export interface Database {
           group_id: string | null;
           parcel_number: number | null;
           total_parcels: number | null;
+          card_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -149,6 +150,7 @@ export interface Database {
           group_id?: string | null;
           parcel_number?: number | null;
           total_parcels?: number | null;
+          card_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -164,6 +166,67 @@ export interface Database {
           group_id?: string | null;
           parcel_number?: number | null;
           total_parcels?: number | null;
+          card_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      card_invoice_payments: {
+        Row: {
+          id: string;
+          user_id: string;
+          card_id: string;
+          month: string;
+          amount: number;
+          paid_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          card_id: string;
+          month: string;
+          amount: number;
+          paid_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          card_id?: string;
+          month?: string;
+          amount?: number;
+          paid_at?: string;
+        };
+        Relationships: [];
+      };
+      credit_cards: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          closing_day: number;
+          due_day: number;
+          color: string;
+          card_limit: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          closing_day?: number;
+          due_day?: number;
+          color?: string;
+          card_limit?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          closing_day?: number;
+          due_day?: number;
+          color?: string;
+          card_limit?: number;
           created_at?: string;
         };
         Relationships: [];

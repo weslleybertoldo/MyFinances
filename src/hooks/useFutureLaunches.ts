@@ -112,6 +112,7 @@ interface CreateLaunchInput {
   type: "income" | "expense";
   due_date: string;
   category_id?: string;
+  card_id?: string;
   recurring?: boolean;
   installments?: number;
 }
@@ -125,6 +126,8 @@ export function useCreateFutureLaunch() {
       const amount = Math.abs(launch.amount);
       if (isNaN(amount) || amount === 0) throw new Error("Valor inválido");
 
+      const cardId = launch.card_id ?? null;
+
       if (launch.installments && launch.installments > 1) {
         const groupId = crypto.randomUUID();
         const rows = [];
@@ -136,6 +139,7 @@ export function useCreateFutureLaunch() {
             type: launch.type,
             due_date: addMonths(launch.due_date, i),
             category_id: launch.category_id ?? null,
+            card_id: cardId,
             recurring: false,
             group_id: groupId,
             parcel_number: i + 1,
@@ -155,6 +159,7 @@ export function useCreateFutureLaunch() {
             type: launch.type,
             due_date: addMonths(launch.due_date, i),
             category_id: launch.category_id ?? null,
+            card_id: cardId,
             recurring: true,
             group_id: groupId,
           });
@@ -169,6 +174,7 @@ export function useCreateFutureLaunch() {
           type: launch.type,
           due_date: launch.due_date,
           category_id: launch.category_id ?? null,
+          card_id: cardId,
           recurring: false,
         });
         if (error) throw error;
@@ -189,6 +195,7 @@ export function useUpdateFutureLaunch() {
       description?: string;
       due_date?: string;
       category_id?: string | null;
+      card_id?: string | null;
       recurring?: boolean;
       type?: "income" | "expense";
     }) => {
@@ -200,6 +207,7 @@ export function useUpdateFutureLaunch() {
       if (updates.type !== undefined) cleanUpdates.type = updates.type;
       if (updates.amount !== undefined) cleanUpdates.amount = Math.abs(updates.amount);
       if ("category_id" in updates) cleanUpdates.category_id = updates.category_id ?? null;
+      if ("card_id" in updates) cleanUpdates.card_id = updates.card_id ?? null;
 
       const { error } = await supabase.from("future_launches").update(cleanUpdates).eq("id", id);
       if (error) throw error;
@@ -229,6 +237,23 @@ export function useUpdateFutureLaunchGroup() {
         .from("future_launches")
         .update(cleanUpdates)
         .eq("group_id", groupId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["future-launches"] }),
+  });
+}
+
+/** Limpa card_id de todas as parcelas não pagas do mesmo grupo */
+export function useClearCardFromGroup() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ groupId }: { groupId: string }) => {
+      const { error } = await supabase
+        .from("future_launches")
+        .update({ card_id: null })
+        .eq("group_id", groupId)
+        .eq("paid", false);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["future-launches"] }),

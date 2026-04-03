@@ -1,10 +1,11 @@
 import type { Database } from "./database.types";
-import type { BankAccount, Transaction, FutureLaunch, Category } from "./types";
+import type { BankAccount, Transaction, FutureLaunch, Category, CreditCard } from "./types";
 
 type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
 type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
 type FutureLaunchRow = Database["public"]["Tables"]["future_launches"]["Row"];
 type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
+type CreditCardRow = Database["public"]["Tables"]["credit_cards"]["Row"];
 
 export type CategoryMap = Map<string, { name: string; color: string }>;
 
@@ -71,5 +72,17 @@ export function mapFutureLaunch(row: FutureLaunchRow, catMap: CategoryMap): Futu
     groupId: row.group_id,
     parcelNumber: row.parcel_number,
     totalParcels: row.total_parcels,
+    cardId: row.card_id,
+  };
+}
+
+export function mapCreditCard(row: CreditCardRow): CreditCard {
+  return {
+    id: row.id,
+    name: row.name,
+    closingDay: row.closing_day,
+    dueDay: row.due_day,
+    color: row.color,
+    limit: Number(row.card_limit),
   };
 }
