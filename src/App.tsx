@@ -17,11 +17,6 @@ import Projects from "@/pages/Projects";
 import CreditCardsPage from "@/pages/CreditCards";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
-import { setupDeepLinkListener } from "@/lib/capacitorAuth";
-
-// Setup deep link listener IMEDIATAMENTE no boot (antes do React render)
-setupDeepLinkListener();
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

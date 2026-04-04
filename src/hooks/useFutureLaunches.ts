@@ -102,7 +102,8 @@ export function useFutureLaunches() {
         .eq("user_id", user!.id)
         .order("due_date");
       if (error) throw error;
-      return (data ?? []).map((row) => mapFutureLaunch(row, catMap!));
+      if (!catMap) return [];
+      return (data ?? []).map((row) => mapFutureLaunch(row, catMap));
     },
   });
 }

@@ -167,6 +167,7 @@ export default function FutureLaunches() {
   const togglePaid = (id: string, currentPaid: boolean) => {
     if (currentPaid) {
       const launch = allLaunches.find((l) => l.id === id);
+      if (!launch) return;
       // Desmarcar — limpa paid e card_id
       updateLaunch.mutate({ id, paid: false, card_id: null });
       // Se tinha card_id e grupo, limpa card_id das parcelas futuras não pagas do grupo
@@ -268,7 +269,7 @@ export default function FutureLaunches() {
     const launch = allLaunches.find((l) => l.id === editingId);
 
     const amount = parseFloat(editForm.amount);
-    if (isNaN(amount) || amount === 0) return;
+    if (isNaN(amount) || amount <= 0) return;
 
     if (updateAllParcels && launch?.groupId) {
       // Atualiza nome, categoria, tipo e valor de TODAS as parcelas do grupo
@@ -296,7 +297,10 @@ export default function FutureLaunches() {
       }
 
       // Atualiza a data desta parcela individualmente
-      updateLaunch.mutate({ id: editingId, due_date: editForm.dueDate });
+      updateLaunch.mutate({ id: editingId, due_date: editForm.dueDate }, {
+        onSuccess: () => { setConfirmUpdateGroup(false); setEditingId(null); },
+        onError: () => { setConfirmUpdateGroup(false); },
+      });
     } else {
       // Atualiza só esta parcela
       updateLaunch.mutate({
@@ -307,11 +311,11 @@ export default function FutureLaunches() {
         category_id: editForm.categoryId || null,
         type: editForm.type,
         recurring: editForm.recurring,
+      }, {
+        onSuccess: () => { setConfirmUpdateGroup(false); setEditingId(null); },
+        onError: () => { setConfirmUpdateGroup(false); },
       });
     }
-
-    setEditingId(null);
-    setConfirmUpdateGroup(false);
   };
 
   const removeLaunch = (l: typeof forecast[0]) => {

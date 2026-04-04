@@ -54,9 +54,10 @@ export default function Settings() {
   };
 
   const handleDelete = () => {
-    if (!confirmDeleteId) return;
-    deleteCategory.mutate(confirmDeleteId);
-    setConfirmDeleteId(null);
+    if (!confirmDeleteId || deleteCategory.isPending) return;
+    deleteCategory.mutate(confirmDeleteId, {
+      onSettled: () => setConfirmDeleteId(null),
+    });
   };
 
   return (
@@ -200,7 +201,9 @@ export default function Settings() {
           </p>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleDelete}>Excluir</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteCategory.isPending}>
+              {deleteCategory.isPending ? "Excluindo..." : "Excluir"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

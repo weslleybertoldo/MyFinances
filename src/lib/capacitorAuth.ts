@@ -36,6 +36,3 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
   }
 }
 
-export function setupDeepLinkListener() {
-  // Não precisa mais — appStateChange cuida de tudo
-}

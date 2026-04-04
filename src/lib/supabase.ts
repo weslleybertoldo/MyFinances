@@ -38,7 +38,7 @@ function createResilientFetch(retries = 2, timeout = 15000) {
         return response;
       } catch (err) {
         clearTimeout(timeoutId);
-        lastError = err as Error;
+        lastError = err instanceof Error ? err : new Error(String(err));
 
         if (attempt < retries && (err as Error).name !== "AbortError") {
           const delay = Math.min(1000 * Math.pow(2, attempt), 10000);

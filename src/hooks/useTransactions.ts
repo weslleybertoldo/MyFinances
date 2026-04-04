@@ -52,7 +52,8 @@ export function useTransactions(filters?: TransactionFilters) {
       const { data, error } = await query;
       if (error) throw error;
 
-      return (data ?? []).map((row) => mapTransaction(row, catMap!));
+      if (!catMap) return [];
+      return (data ?? []).map((row) => mapTransaction(row, catMap));
     },
   });
 }
