@@ -26,7 +26,8 @@ async function extendRecurringLaunches(userId: string) {
     .eq("recurring", true)
     .not("group_id", "is", null);
 
-  if (error || !launches?.length) return;
+  if (error) { console.warn("[FutureLaunches] Erro ao buscar recorrentes:", error.message); return; }
+  if (!launches?.length) return;
 
   const recurringGroups = new Map<string, Array<Record<string, unknown>>>();
   for (const l of launches) {
@@ -88,7 +89,7 @@ export function useFutureLaunches() {
     extendedRef.current = true;
     extendRecurringLaunches(user.id).then(() => {
       qc.invalidateQueries({ queryKey: ["future-launches"] });
-    });
+    }).catch(e => console.warn("[FutureLaunches] Erro ao estender recorrentes:", e));
   }, [user, qc]);
 
   return useQuery<FutureLaunch[]>({

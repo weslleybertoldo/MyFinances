@@ -42,8 +42,8 @@ async function seedCategories(userId: string) {
         DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId }))
       );
     }
-  } catch {
-    // silently fail
+  } catch (e) {
+    console.warn("[Auth] Erro ao seed categorias:", e);
   }
 }
 
@@ -52,37 +52,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const signingOut = useRef(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // No Capacitor, verificar sessão quando app volta pro foreground (após login Google)
+    // Listener Capacitor — verificar sessão quando app volta ao foreground
+    let capListener: { remove: () => Promise<void> } | null = null;
     if (Capacitor.isNativePlatform()) {
-      CapApp.addListener("appStateChange", async ({ isActive }) => {
-        if (isActive && !user) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            const email = session.user.email?.toLowerCase();
-            if (email === ALLOWED_EMAIL) {
-              setSession(session);
-              setUser(session.user);
-              seedCategories(session.user.id);
+      capListener = CapApp.addListener("appStateChange", async ({ isActive }) => {
+        try {
+          if (isActive && !user) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+              const email = session.user.email?.toLowerCase();
+              if (email === ALLOWED_EMAIL) {
+                setSession(session);
+                setUser(session.user);
+                seedCategories(session.user.id);
+              }
             }
           }
+        } catch (e) {
+          console.warn("[Auth] Erro ao verificar sessão no foreground:", e);
         }
       });
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const email = session.user.email?.toLowerCase();
-        if (email === ALLOWED_EMAIL) {
-          setSession(session);
-          setUser(session.user);
-          seedCategories(session.user.id);
+    // Sessão inicial
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          const email = session.user.email?.toLowerCase();
+          if (email === ALLOWED_EMAIL) {
+            setSession(session);
+            setUser(session.user);
+            seedCategories(session.user.id);
+          }
         }
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      }).catch(() => setLoading(false));
+    }
 
+    // Listener de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (signingOut.current) return;
 
@@ -91,6 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (email !== ALLOWED_EMAIL) {
           signingOut.current = true;
           supabase.auth.signOut().then(() => {
+            signingOut.current = false;
+          }).catch(() => {
             signingOut.current = false;
           });
           setSession(null);
@@ -109,7 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (capListener) capListener.remove();
+    };
   }, []);
 
   const signInWithGoogle = async (): Promise<{ error: string | null }> => {

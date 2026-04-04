@@ -289,7 +289,11 @@ export default function FutureLaunches() {
         const day = String(Math.min(newDay, lastDay)).padStart(2, "0");
         return supabase.from("future_launches").update({ due_date: `${sy}-${sm}-${day}` }).eq("id", s.id);
       });
-      await Promise.all(dateUpdates);
+      try {
+        await Promise.all(dateUpdates);
+      } catch (e) {
+        console.error("[FutureLaunches] Erro ao atualizar datas das parcelas:", e);
+      }
 
       // Atualiza a data desta parcela individualmente
       updateLaunch.mutate({ id: editingId, due_date: editForm.dueDate });
