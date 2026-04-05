@@ -178,7 +178,8 @@ export default function CreditCards() {
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
             return inv.month === currentMonth;
           })?.total ?? 0;
-          // Total gasto = despesas em faturas NÃO pagas
+          // Total gasto = despesas em faturas NAO pagas via "Pagar fatura"
+          // paid individual e so controle pessoal, nao afeta o limite
           const isInvPaid = (invMonth: string) => invoicePayments.some((p) => p.cardId === card.id && p.month === invMonth);
           const totalUsed = allLaunches
             .filter((l) => {
