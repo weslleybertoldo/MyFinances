@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { signInWithGoogle as capacitorSignIn } from "@/lib/capacitorAuth";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 
 const ALLOWED_EMAIL = "weslleybertoldo18@gmail.com";
 
@@ -60,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (Capacitor.isNativePlatform()) {
       capListener = CapApp.addListener("appStateChange", async ({ isActive }) => {
         try {
+          if (isActive) {
+            Browser.close().catch(() => {});
+          }
           if (isActive && !user) {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
