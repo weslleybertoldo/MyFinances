@@ -70,7 +70,7 @@ async function syncItem(itemId: string) {
         description: pt.description || pt.descriptionRaw || "Sem descrição",
         amount: Math.abs(pt.amount),
         type: pt.type === "CREDIT" ? "income" : "expense",
-        date: pt.date ? pt.date.split("T")[0] : new Date().toISOString().split("T")[0],
+        date: pt.date ? (pt.date instanceof Date ? pt.date.toISOString().split("T")[0] : String(pt.date).split("T")[0]) : new Date().toISOString().split("T")[0],
         pluggy_transaction_id: pt.id,
       });
 

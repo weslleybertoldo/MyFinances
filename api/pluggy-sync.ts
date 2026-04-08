@@ -49,7 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         accountDbId = existing.id;
         syncedAccounts.push({ id: existing.id, name: pa.name, balance: pa.balance, action: "updated" });
       } else {
-        const bankName = pa.bankData?.shortName || pa.bankData?.name || "Banco";
+        const bankData = pa.bankData as Record<string, unknown> | undefined;
+        const bankName = (bankData?.shortName as string) || (bankData?.name as string) || "Banco";
         const { data: newAcc } = await supabase.from("accounts").insert({
           user_id: userId,
           name: pa.subtype || pa.type || "Conta",
