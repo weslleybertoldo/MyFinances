@@ -25,3 +25,6 @@ dist-ssr
 .vercel
 myfinances-release.keystore
 icon_1024.png
+
+# Environment variables
+.env*
