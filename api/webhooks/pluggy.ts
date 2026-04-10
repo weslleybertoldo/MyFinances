@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { PluggyClient } from "pluggy-sdk";
 import { createClient } from "@supabase/supabase-js";
@@ -94,7 +95,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const querySecret = req.query?.secret as string | undefined;
   const providedSecret = authHeader?.replace("Bearer ", "") || querySecret;
 
-  if (providedSecret !== WEBHOOK_SECRET) {
+  const isValid =
+    providedSecret &&
+    WEBHOOK_SECRET &&
+    providedSecret.length === WEBHOOK_SECRET.length &&
+    crypto.timingSafeEqual(Buffer.from(providedSecret), Buffer.from(WEBHOOK_SECRET));
+  if (!isValid) {
     return res.status(401).json({ error: "Não autorizado" });
   }
 
