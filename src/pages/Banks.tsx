@@ -11,7 +11,7 @@ import { PluggyConnect } from "react-pluggy-connect";
 
 export default function Banks() {
   const { data: accounts = [], isLoading } = useAccounts();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const qc = useQueryClient();
   const deleteAccount = useDeleteAccount();
   const [connectToken, setConnectToken] = useState<string | null>(null);
@@ -21,7 +21,10 @@ export default function Banks() {
 
   const openPluggyConnect = async () => {
     try {
-      const res = await fetch("/api/pluggy-token", { method: "POST" });
+      const res = await fetch("/api/pluggy-token", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
       const data = await res.json();
       if (data.accessToken) {
         setConnectToken(data.accessToken);
@@ -40,8 +43,11 @@ export default function Banks() {
     try {
       const res = await fetch("/api/pluggy-sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: data.item.id, userId: user?.id }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ itemId: data.item.id }),
       });
       const result = await res.json();
       if (result.success) {
@@ -54,7 +60,7 @@ export default function Banks() {
     } catch {
       setSyncMessage("Erro ao sincronizar");
     }
-  }, [user, qc]);
+  }, [user, session, qc]);
 
   const handlePluggyError = useCallback((error: { message?: string; code?: string }) => {
     setShowPluggy(false);
@@ -74,8 +80,11 @@ export default function Banks() {
     try {
       const res = await fetch("/api/pluggy-sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: pluggyItemId, userId: user.id }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ itemId: pluggyItemId }),
       });
       const result = await res.json();
       if (result.success) {

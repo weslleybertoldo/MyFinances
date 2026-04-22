@@ -12,8 +12,23 @@ export const config = {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { itemId, userId } = req.body;
-  if (!itemId || !userId) return res.status(400).json({ error: "itemId and userId required" });
+  // Verificar autenticação JWT
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Token de autenticação necessário" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  const authSupabase = createClient(SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY!);
+  const { data: { user }, error: authError } = await authSupabase.auth.getUser(token);
+  if (authError || !user) {
+    return res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+
+  // userId extraído do JWT verificado, não do body
+  const userId = user.id;
+  const { itemId } = req.body;
+  if (!itemId) return res.status(400).json({ error: "itemId required" });
 
   try {
     const pluggy = new PluggyClient({
