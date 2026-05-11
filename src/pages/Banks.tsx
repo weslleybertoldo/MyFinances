@@ -60,7 +60,7 @@ export default function Banks() {
     } catch {
       setSyncMessage("Erro ao sincronizar");
     }
-  }, [user, session, qc]);
+  }, [session, qc]);
 
   const handlePluggyError = useCallback((error: { message?: string; code?: string }) => {
     setShowPluggy(false);
