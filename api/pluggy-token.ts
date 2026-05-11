@@ -21,6 +21,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "Token inválido ou expirado" });
   }
 
+  if (user.email?.toLowerCase() !== "weslleybertoldo18@gmail.com") {
+    return res.status(403).json({ error: "Acesso negado" });
+  }
+
   try {
     const pluggy = new PluggyClient({
       clientId: process.env.PLUGGY_CLIENT_ID!,
@@ -30,7 +34,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const connectToken = await pluggy.createConnectToken();
 
     return res.json({ accessToken: connectToken.accessToken });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Erro Pluggy";
+    console.error("[pluggy-token]", msg);
+    return res.status(500).json({ error: "Erro ao criar connect token" });
   }
 }

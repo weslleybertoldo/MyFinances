@@ -25,6 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "Token inválido ou expirado" });
   }
 
+  if (user.email?.toLowerCase() !== "weslleybertoldo18@gmail.com") {
+    return res.status(403).json({ error: "Acesso negado" });
+  }
+
   // userId extraído do JWT verificado, não do body
   const userId = user.id;
   const { itemId } = req.body;

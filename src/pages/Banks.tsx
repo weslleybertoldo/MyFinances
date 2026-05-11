@@ -138,7 +138,7 @@ export default function Banks() {
           connectToken={connectToken}
           includeSandbox={true}
           onSuccess={handlePluggySuccess}
-          onError={handlePluggyError as any}
+          onError={handlePluggyError as unknown as (err: unknown) => void}
           onClose={() => setShowPluggy(false)}
         />
       )}
