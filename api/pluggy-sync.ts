@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { PluggyClient } from "pluggy-sdk";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit } from "./_rate-limit";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -27,6 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (user.email?.toLowerCase() !== "weslleybertoldo18@gmail.com") {
     return res.status(403).json({ error: "Acesso negado" });
+  }
+
+  // Rate limit: 6 req / 5 min por user (sync e caro: 1 fetchAccounts + N fetchTransactions)
+  const rl = rateLimit(`pluggy-sync:${user.id}`, 6, 5 * 60 * 1000);
+  if (!rl.ok) {
+    res.setHeader("Retry-After", String(rl.retryAfter ?? 60));
+    return res.status(429).json({ error: "Muitas sincronizações, tente em instantes" });
   }
 
   // userId extraído do JWT verificado, não do body
@@ -116,9 +124,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
       if (newTransactions.length > 0) {
-        const { error: insertError } = await supabase.from("transactions").insert(newTransactions);
-        if (insertError) {
-          console.error("Insert error:", insertError.message);
+        const { error: upsertError } = await supabase
+          .from("transactions")
+          .upsert(newTransactions, { onConflict: "user_id,pluggy_transaction_id", ignoreDuplicates: true });
+        if (upsertError) {
+          console.error("Upsert error:", upsertError.message);
         } else {
           totalTxSynced += newTransactions.length;
         }

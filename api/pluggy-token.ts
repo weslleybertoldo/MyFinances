@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { PluggyClient } from "pluggy-sdk";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit } from "./_rate-limit";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -23,6 +24,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (user.email?.toLowerCase() !== "weslleybertoldo18@gmail.com") {
     return res.status(403).json({ error: "Acesso negado" });
+  }
+
+  // Rate limit: 10 req / 5 min por user (token endpoint cobra na Pluggy)
+  const rl = rateLimit(`pluggy-token:${user.id}`, 10, 5 * 60 * 1000);
+  if (!rl.ok) {
+    res.setHeader("Retry-After", String(rl.retryAfter ?? 60));
+    return res.status(429).json({ error: "Muitas requisições, tente em instantes" });
   }
 
   try {

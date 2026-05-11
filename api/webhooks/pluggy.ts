@@ -54,29 +54,29 @@ async function syncItem(itemId: string) {
       console.error(`Erro ao atualizar conta ${accountDbId}:`, updateError.message);
     }
 
-    // Sync new transactions
+    // Sync new transactions — bulk upsert com onConflict (mata N+1)
     const txData = await pluggy.fetchTransactions(pa.id, { pageSize: 500 });
-    for (const pt of txData.results || []) {
-      const { data: existingTx } = await supabase
+    const rows = (txData.results || []).map((pt) => ({
+      user_id: userId,
+      account_id: accountDbId,
+      description: pt.description || pt.descriptionRaw || "Sem descrição",
+      amount: Math.abs(pt.amount),
+      type: pt.type === "CREDIT" ? "income" : "expense",
+      date: pt.date
+        ? pt.date instanceof Date
+          ? pt.date.toISOString().split("T")[0]
+          : String(pt.date).split("T")[0]
+        : new Date().toISOString().split("T")[0],
+      pluggy_transaction_id: pt.id,
+    }));
+
+    if (rows.length > 0) {
+      const { error: upsertError } = await supabase
         .from("transactions")
-        .select("id")
-        .eq("pluggy_transaction_id", pt.id)
-        .maybeSingle();
+        .upsert(rows, { onConflict: "user_id,pluggy_transaction_id", ignoreDuplicates: true });
 
-      if (existingTx) continue;
-
-      const { error: insertError } = await supabase.from("transactions").insert({
-        user_id: userId,
-        account_id: accountDbId,
-        description: pt.description || pt.descriptionRaw || "Sem descrição",
-        amount: Math.abs(pt.amount),
-        type: pt.type === "CREDIT" ? "income" : "expense",
-        date: pt.date ? (pt.date instanceof Date ? pt.date.toISOString().split("T")[0] : String(pt.date).split("T")[0]) : new Date().toISOString().split("T")[0],
-        pluggy_transaction_id: pt.id,
-      });
-
-      if (insertError) {
-        console.error(`Erro ao inserir transação ${pt.id}:`, insertError.message);
+      if (upsertError) {
+        console.error(`Erro ao upsert transações (${rows.length}):`, upsertError.message);
       }
     }
   }
