@@ -17,8 +17,16 @@ function addMonths(baseDate: string, months: number): string {
   return `${targetYear}-${String(targetMon + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Estende recorrentes pra manter 12 meses à frente. Roda uma vez por sessão. */
+const EXTEND_THROTTLE_KEY = "myf:lastExtendAt";
+const EXTEND_THROTTLE_MS = 12 * 60 * 60 * 1000; // 12h
+
+/** Estende recorrentes pra manter 12 meses à frente. Throttle 12h via localStorage + idempotente via UNIQUE. */
 async function extendRecurringLaunches(userId: string) {
+  try {
+    const last = Number(localStorage.getItem(EXTEND_THROTTLE_KEY)) || 0;
+    if (Date.now() - last < EXTEND_THROTTLE_MS) return;
+  } catch { /* localStorage indisponivel — segue */ }
+
   const { data: launches, error } = await supabase
     .from("future_launches")
     .select("*")
@@ -27,7 +35,10 @@ async function extendRecurringLaunches(userId: string) {
     .not("group_id", "is", null);
 
   if (error) { console.warn("[FutureLaunches] Erro ao buscar recorrentes:", error.message); return; }
-  if (!launches?.length) return;
+  if (!launches?.length) {
+    try { localStorage.setItem(EXTEND_THROTTLE_KEY, String(Date.now())); } catch { /* noop */ }
+    return;
+  }
 
   const recurringGroups = new Map<string, Array<Record<string, unknown>>>();
   for (const l of launches) {
@@ -72,9 +83,16 @@ async function extendRecurringLaunches(userId: string) {
   }
 
   if (newRows.length > 0) {
-    // UNIQUE index (group_id, due_date) previne duplicatas mesmo com race condition
-    await supabase.from("future_launches").insert(newRows);
+    // UNIQUE (group_id, due_date) previne duplicatas em race entre sessoes
+    const { error: insErr } = await supabase
+      .from("future_launches")
+      .upsert(newRows, { onConflict: "group_id,due_date", ignoreDuplicates: true });
+    if (insErr) {
+      console.warn("[FutureLaunches] Erro ao estender:", insErr.message);
+      return;
+    }
   }
+  try { localStorage.setItem(EXTEND_THROTTLE_KEY, String(Date.now())); } catch { /* noop */ }
 }
 
 export function useFutureLaunches() {

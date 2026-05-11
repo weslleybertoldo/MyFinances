@@ -58,6 +58,26 @@ export function useTransactions(filters?: TransactionFilters) {
   });
 }
 
+// Extrai pattern reutilizavel da descricao bruta da transacao Pluggy.
+// Pega ate 3 tokens alfabeticos com >= 4 chars, ignora stopwords e numeros.
+// Ex: "COMPRA CARTAO IFOOD 12/04 R$25,90" -> "ifood"
+const STOPWORDS = new Set([
+  "compra", "cartao", "cartão", "pix", "transf", "transferencia", "transferência",
+  "pagamento", "debito", "débito", "credito", "crédito", "para", "para_", "loja", "online",
+  "boleto", "tarifa", "saque", "deposito", "depósito", "ted", "doc",
+]);
+
+export function extractRulePattern(description: string): string | null {
+  const tokens = description
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length >= 4 && !/^\d+$/.test(t) && !STOPWORDS.has(t));
+  if (tokens.length === 0) return null;
+  return tokens.slice(0, 3).join(" ");
+}
+
 export function useUpdateTransactionCategory() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -71,11 +91,14 @@ export function useUpdateTransactionCategory() {
         .eq("id", transactionId);
       if (txError) throw txError;
 
-      // Salvar regra de categorização automática (upsert)
+      // Salvar regra de categorização automática so se conseguir extrair pattern util
+      const pattern = extractRulePattern(description);
+      if (!pattern) return;
+
       const { error: ruleError } = await supabase
         .from("category_rules")
         .upsert(
-          { user_id: user!.id, pattern: description, category_id: categoryId },
+          { user_id: user!.id, pattern, category_id: categoryId },
           { onConflict: "user_id,pattern" }
         );
       if (ruleError) throw ruleError;
