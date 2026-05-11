@@ -93,13 +93,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const authHeader = req.headers.authorization;
   const querySecret = req.query?.secret as string | undefined;
-  const providedSecret = authHeader?.replace("Bearer ", "") || querySecret;
+  const providedSecret = authHeader?.replace("Bearer ", "") || querySecret || "";
 
-  const isValid =
-    providedSecret &&
-    WEBHOOK_SECRET &&
-    providedSecret.length === WEBHOOK_SECRET.length &&
-    crypto.timingSafeEqual(Buffer.from(providedSecret), Buffer.from(WEBHOOK_SECRET));
+  // Compara contra hash sha256 de tamanho fixo: zero leak via length
+  const expectedHash = crypto.createHash("sha256").update(WEBHOOK_SECRET).digest();
+  const providedHash = crypto.createHash("sha256").update(providedSecret).digest();
+  const isValid = providedSecret.length > 0 && crypto.timingSafeEqual(providedHash, expectedHash);
   if (!isValid) {
     return res.status(401).json({ error: "Não autorizado" });
   }
@@ -127,6 +126,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
     console.error("Webhook error:", message);
-    return res.status(500).json({ received: false, error: message });
+    return res.status(500).json({ received: false, error: "Erro ao processar webhook" });
   }
 }

@@ -138,6 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({ success: true, accounts: syncedAccounts, transactionsSynced: totalTxSynced });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro desconhecido";
-    return res.status(500).json({ error: message });
+    console.error("[pluggy-sync]", message);
+    return res.status(500).json({ error: "Erro ao sincronizar" });
   }
 }
