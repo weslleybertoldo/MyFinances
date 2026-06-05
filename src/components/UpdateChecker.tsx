@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Download, X, CheckCircle, RefreshCw } from "lucide-react";
+import { downloadAndInstall } from "@/lib/apkUpdater";
 
 const CURRENT_VERSION = __APP_VERSION__;
 const RELEASES_URL = "https://api.github.com/repos/weslleybertoldo/MyFinances/releases/latest";
@@ -27,6 +28,22 @@ export default function UpdateChecker() {
   const [dismissed, setDismissed] = useState(false);
   const [checking, setChecking] = useState(false);
   const [justChecked, setJustChecked] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [needsPerm, setNeedsPerm] = useState(false);
+
+  const handleDownload = async () => {
+    if (!update) return;
+    setNeedsPerm(false);
+    setProgress(0);
+    try {
+      const res = await downloadAndInstall(update.download_url, (p) => setProgress(p));
+      if (res === "permission") setNeedsPerm(true);
+      // Reseta a barra: se cancelar a tela "Instalar?", o botão reaparece.
+      setProgress(null);
+    } catch {
+      setProgress(null);
+    }
+  };
 
   const checkUpdate = async () => {
     setChecking(true);
@@ -81,15 +98,36 @@ export default function UpdateChecker() {
                 <X size={16} />
               </button>
             </div>
-            <a
-              href={update.download_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors"
-            >
-              <Download size={14} />
-              Baixar atualização
-            </a>
+            {progress !== null ? (
+              <div className="mt-3">
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-200"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 text-center">
+                  {progress < 100 ? `Baixando ${progress}%` : "Abrindo instalador..."}
+                </p>
+              </div>
+            ) : (
+              <>
+                {needsPerm && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Permita "instalar apps desconhecidos" para o MyFinances nas
+                    configurações que abriram, depois toque em baixar novamente.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors"
+                >
+                  <Download size={14} />
+                  {needsPerm ? "Tentar novamente" : "Baixar atualização"}
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center justify-between">
