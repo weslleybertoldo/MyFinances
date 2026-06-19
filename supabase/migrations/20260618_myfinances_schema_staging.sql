@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION staging.is_allowed_user()
  RETURNS boolean
  LANGUAGE sql
  STABLE
- SET search_path TO 'staging, public'
+ SET search_path TO staging, public
 AS $function$
   select coalesce(
     (auth.jwt() ->> 'email') = 'weslleybertoldo18@gmail.com',
@@ -33,7 +33,7 @@ $function$;
 CREATE OR REPLACE FUNCTION staging.handle_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
- SET search_path TO 'staging, public'
+ SET search_path TO staging, public
 AS $function$
 begin
   new.updated_at = now();
@@ -44,7 +44,7 @@ $function$;
 CREATE OR REPLACE FUNCTION staging.auto_categorize()
  RETURNS trigger
  LANGUAGE plpgsql
- SET search_path TO 'staging, public'
+ SET search_path TO staging, public
 AS $function$
 declare
   rule_cat_id uuid;
