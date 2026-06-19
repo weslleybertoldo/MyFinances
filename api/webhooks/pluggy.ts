@@ -12,7 +12,7 @@ async function syncItem(itemId: string) {
     clientId: process.env.PLUGGY_CLIENT_ID!,
     clientSecret: process.env.PLUGGY_CLIENT_SECRET!,
   });
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { db: { schema: process.env.DB_SCHEMA || "public" } });
 
   // Validate item ownership — only process if a user owns this item
   const { data: account, error: lookupError } = await supabase

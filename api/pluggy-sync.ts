@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clientSecret: process.env.PLUGGY_CLIENT_SECRET!,
     });
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { db: { schema: process.env.DB_SCHEMA || "public" } });
     const syncedAccounts: Array<{ id: string; name: string; balance: number; action: "created" | "updated" }> = [];
     let totalTxSynced = 0;
 
