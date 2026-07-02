@@ -2,25 +2,30 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    # A cada 5 dias as 9h UTC (antes do limite de 7 dias)
-    - cron: '0 9 */5 * *'
+    # A cada 3 dias as 9h UTC. Margem sob o limite de ~7 dias de inatividade.
+    # (antes: 5 dias + ping so no /auth/v1/health, que NAO conta como atividade
+    #  do data plane -> o projeto pausou mesmo com os runs verdes em 26/06/2026)
+    - cron: '0 9 */3 * *'
   workflow_dispatch:
 
 jobs:
   ping-supabase:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping runtime do projeto (auth/v1/health)
-        # Trafego HTTP no host <ref>.supabase.co — exatamente o tipo de
-        # trafego que uso normal faz. Anon key e publica (vai pro frontend).
+      - name: Query REST real no data plane (PostgREST) — ISSO conta como atividade
+        # GET /rest/v1/<tabela> com service_role retorna 200 com dados reais.
+        # E trafego de DADOS no projeto (data plane), o unico que reseta o
+        # timer de auto-pause. /auth/v1/health e o Management API NAO contam.
         run: |
           set -e
           RES=$(curl -s -w "\n%{http_code}" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveWFmdG1ncGF4YmJtZGloa3huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNDc5ODMsImV4cCI6MjA5MDYyMzk4M30.K1njSRqS3q7rNEkEosL0yTG2sUdET1kYSL8ARxF5C1I" \
-            "https://aoyaftmgpaxbbmdihkxn.supabase.co/auth/v1/health")
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE }}" \
+            "https://aoyaftmgpaxbbmdihkxn.supabase.co/rest/v1/categories?select=id&limit=1")
           CODE=$(echo "$RES" | tail -1)
-          echo "MyFinances runtime ping: HTTP $CODE"
-          [ "$CODE" = "200" ] || (echo "ERRO" && exit 1)
+          BODY=$(echo "$RES" | sed '$d')
+          echo "MyFinances REST ping (data plane): HTTP $CODE | $BODY"
+          [ "$CODE" = "200" ] || (echo "ERRO: data plane nao respondeu 200" && exit 1)
 
       - name: Executar SQL real no Postgres (camada extra)
         run: |
