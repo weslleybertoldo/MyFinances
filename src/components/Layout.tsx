@@ -7,7 +7,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center border-b bg-card px-4 gap-4">
             <SidebarTrigger />
             <span className="text-sm font-medium">MyFinances</span>

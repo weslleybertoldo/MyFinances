@@ -102,8 +102,8 @@ export default function Projects() {
         <Card key={project.id}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <button onClick={() => toggleExpand(project.id)} className="flex items-center gap-2 flex-1 text-left">
-                {expandedId === project.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <button onClick={() => toggleExpand(project.id)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+                {expandedId === project.id ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                 {editingProjectId === project.id ? (
                   <div className="flex items-center gap-2 flex-1" onClick={(e) => e.stopPropagation()}>
                     <Input
@@ -118,10 +118,10 @@ export default function Projects() {
                     }}>OK</Button>
                   </div>
                 ) : (
-                  <CardTitle className="text-base">{project.name}</CardTitle>
+                  <CardTitle className="text-base truncate">{project.name}</CardTitle>
                 )}
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <span className="text-sm font-bold">{formatCurrency(project.total)}</span>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => {
                   e.stopPropagation();
