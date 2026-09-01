@@ -21,9 +21,17 @@ export default defineConfig(({ mode }) => ({
     // Vite direto e apontamos /api pro `vercel dev` em outra porta:
     //   API_PROXY_TARGET=http://localhost:5191 npx vite --port 5190
     // DEV_ALLOWED_HOST libera um host de tunel (ex. cloudflared) pra testar no celular.
-    proxy: process.env.API_PROXY_TARGET
-      ? { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: true } }
-      : undefined,
+    // /sb replica em dev o rewrite do vercel.json (fallback de DNS do supabase client).
+    proxy: {
+      ...(process.env.API_PROXY_TARGET
+        ? { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: true } }
+        : {}),
+      "/sb": {
+        target: "https://aoyaftmgpaxbbmdihkxn.supabase.co",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/sb/, ""),
+      },
+    },
     allowedHosts: process.env.DEV_ALLOWED_HOST ? [process.env.DEV_ALLOWED_HOST] : undefined,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
