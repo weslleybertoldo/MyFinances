@@ -93,7 +93,8 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* flex-wrap: em tela estreita o seletor de mês desce pra 2ª linha em vez de estourar */}
+      <div className="flex flex-wrap items-center justify-between gap-y-2">
         <div>
           <h1 className="text-2xl font-bold">Transações</h1>
           <p className="text-muted-foreground">Gerencie e categorize suas transações</p>

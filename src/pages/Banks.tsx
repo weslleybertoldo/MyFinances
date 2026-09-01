@@ -1,13 +1,14 @@
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, Trash2, Upload, ChevronDown, ChevronUp } from "lucide-react";
+import { Building2, Trash2, Upload, ChevronDown, ChevronUp, Mail } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
 import { useAccounts, useDeleteAccount } from "@/hooks/useAccounts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { decodeOfx, parseOfx, OfxParseError } from "@/lib/ofx";
-import { importOfxStatement } from "@/lib/ofxImport";
+import { importOfxStatement, type ImportResult } from "@/lib/ofxImport";
 import { BankImportPanel, LastImportSummary } from "@/components/BankImportPanel";
 import { PageLoader } from "@/components/PageLoader";
 
@@ -19,7 +20,17 @@ export default function Banks() {
   const [message, setMessage] = useState("");
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const afterImport = (results: ImportResult[]) => {
+    if (results.length > 0) {
+      setExpandedAccount(results[results.length - 1].accountId);
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["bank-imports"] });
+    }
+  };
 
   const handleOfxFile = async (file: File | undefined) => {
     if (!file || !user) return;
@@ -28,6 +39,7 @@ export default function Banks() {
     try {
       const statement = parseOfx(decodeOfx(await file.arrayBuffer()));
       const result = await importOfxStatement({
+        client: supabase,
         userId: user.id,
         statement,
         fileName: file.name,
@@ -37,10 +49,7 @@ export default function Banks() {
       if (result.skipped > 0) partes.push(`${result.skipped} já existia(m)`);
       if (result.accountCreated) partes.push("conta criada");
       setMessage(`${partes.join(" · ")}.`);
-      setExpandedAccount(result.accountId);
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-      qc.invalidateQueries({ queryKey: ["transactions"] });
-      qc.invalidateQueries({ queryKey: ["bank-imports"] });
+      afterImport([result]);
     } catch (e) {
       // Erro de parse tem mensagem propria e util; o resto vira mensagem generica.
       setMessage(
@@ -51,6 +60,46 @@ export default function Banks() {
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Manda o backend olhar o Gmail agora (mesmo caminho do pg_cron de hora em hora).
+  const handleEmailSync = async () => {
+    setCheckingEmail(true);
+    setMessage("Verificando o e-mail...");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("sessão expirada — entre de novo");
+
+      const res = await fetch("/api/ofx-email-sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; imports?: Array<ImportResult & { fileName: string }> }
+        | null;
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+      if (!body?.ok) throw new Error(body?.error ?? "resposta inesperada do servidor");
+
+      const imports = body.imports ?? [];
+      if (imports.length === 0) {
+        setMessage("Nenhum extrato novo no e-mail.");
+      } else {
+        const imported = imports.reduce((s, i) => s + i.imported, 0);
+        const skipped = imports.reduce((s, i) => s + i.skipped, 0);
+        const partes = [
+          `${imports.length} extrato(s) do e-mail`,
+          `${imported} transação(ões) importada(s)`,
+        ];
+        if (skipped > 0) partes.push(`${skipped} já existia(m)`);
+        if (imports.some((i) => i.accountCreated)) partes.push("conta criada");
+        setMessage(`${partes.join(" · ")}.`);
+        afterImport(imports);
+      }
+    } catch (e) {
+      setMessage(`Erro ao verificar o e-mail: ${e instanceof Error ? e.message : "desconhecido"}`);
+    } finally {
+      setCheckingEmail(false);
     }
   };
 
@@ -85,10 +134,16 @@ export default function Banks() {
           className="hidden"
           onChange={(e) => handleOfxFile(e.target.files?.[0])}
         />
-        <Button onClick={() => fileInputRef.current?.click()} disabled={importing}>
-          <Upload className="h-4 w-4 mr-2" />
-          {importing ? "Importando..." : "Importar extrato (OFX)"}
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            <Upload className="h-4 w-4 mr-2" />
+            {importing ? "Importando..." : "Importar extrato (OFX)"}
+          </Button>
+          <Button variant="outline" onClick={handleEmailSync} disabled={checkingEmail || importing}>
+            <Mail className="h-4 w-4 mr-2" />
+            {checkingEmail ? "Verificando..." : "Verificar e-mail"}
+          </Button>
+        </div>
       </div>
 
       {message && (
