@@ -67,6 +67,9 @@ async function extendRecurringLaunches(userId: string) {
       const dateStr = addMonths(firstDate, offset);
       const monthKey = dateStr.substring(0, 7);
       if (monthKey > targetMonth) break;
+      // So gera meses DEPOIS do ultimo existente: buraco no meio e exclusao
+      // proposital do usuario (Excluir so esta) e nao pode voltar sozinho.
+      if (monthKey <= lastMonth) continue;
       if (existingMonths.has(monthKey)) continue;
 
       newRows.push({
@@ -118,7 +121,11 @@ export function useFutureLaunches() {
         .from("future_launches")
         .select("*")
         .eq("user_id", user!.id)
-        .order("due_date");
+        // created_at/id = desempate estavel: so por due_date, lancamentos do mesmo dia
+        // trocavam de posicao a cada UPDATE (o Postgres realoca a tupla).
+        .order("due_date")
+        .order("created_at")
+        .order("id");
       if (error) throw error;
       if (!catMap) return [];
       return (data ?? []).map((row) => mapFutureLaunch(row, catMap));

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowDownIcon, ArrowUpIcon, WalletIcon, TrendingUpIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mock-data";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useTransactions } from "@/hooks/useTransactions";
+import { PageLoader } from "@/components/PageLoader";
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -20,8 +20,8 @@ function getMonthLabel(monthStr: string) {
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(() => getMonthStr(new Date()));
-  const { data: accounts = [], isLoading: loadingAccounts } = useAccounts();
-  const { data: transactions = [], isLoading: loadingTx } = useTransactions({ month: selectedMonth });
+  const { data: accounts = [], isPending: loadingAccounts } = useAccounts();
+  const { data: transactions = [], isPending: loadingTx } = useTransactions({ month: selectedMonth });
 
   const prevMonth = () => {
     const [y, m] = selectedMonth.split("-").map(Number);
@@ -53,19 +53,7 @@ export default function Dashboard() {
   const isLoading = loadingAccounts || loadingTx;
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}><CardContent className="pt-6"><div className="h-12 bg-muted animate-pulse rounded" /></CardContent></Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <PageLoader title="Dashboard" />;
   }
 
   return (
@@ -149,9 +137,6 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-sm">{formatCurrency(account.balance)}</p>
-                  <Badge variant={account.connected ? "default" : "secondary"} className="text-[10px]">
-                    {account.connected ? "Conectado" : "Desconectado"}
-                  </Badge>
                 </div>
               </div>
             ))}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageLoader } from "@/components/PageLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ function getMonthLabel(monthStr: string) {
 }
 
 export default function CreditCards() {
-  const { data: cards = [], isLoading } = useCreditCards();
+  const { data: cards = [], isPending } = useCreditCards();
   const { data: allLaunches = [] } = useFutureLaunches();
   const { data: invoicePayments = [] } = useInvoicePayments();
   const createCard = useCreateCreditCard();
@@ -101,13 +102,8 @@ export default function CreditCards() {
       }));
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-xl font-bold">Cartões de Crédito</h1>
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
+  if (isPending) {
+    return <PageLoader title="Cartões de Crédito" />;
   }
 
   return (

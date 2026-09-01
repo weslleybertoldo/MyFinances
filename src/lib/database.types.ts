@@ -44,10 +44,9 @@ export interface Database {
           bank: string;
           balance: number;
           color: string;
-          connected: boolean;
-          pluggy_item_id: string | null;
-          pluggy_account_id: string | null;
           last_sync_at: string | null;
+          ofx_bank_id: string | null;
+          ofx_acct_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -58,10 +57,9 @@ export interface Database {
           bank: string;
           balance?: number;
           color?: string;
-          connected?: boolean;
-          pluggy_item_id?: string | null;
-          pluggy_account_id?: string | null;
           last_sync_at?: string | null;
+          ofx_bank_id?: string | null;
+          ofx_acct_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -72,10 +70,9 @@ export interface Database {
           bank?: string;
           balance?: number;
           color?: string;
-          connected?: boolean;
-          pluggy_item_id?: string | null;
-          pluggy_account_id?: string | null;
           last_sync_at?: string | null;
+          ofx_bank_id?: string | null;
+          ofx_acct_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -91,7 +88,14 @@ export interface Database {
           amount: number;
           type: string;
           date: string;
-          pluggy_transaction_id: string | null;
+          import_key: string | null;
+          import_source: string | null;
+          import_memo: string | null;
+          custom_name: string | null;
+          notes: string | null;
+          ofx_fitid: string | null;
+          bank_import_id: string | null;
+          statement_seq: number | null;
           created_at: string;
         };
         Insert: {
@@ -103,7 +107,14 @@ export interface Database {
           amount: number;
           type: string;
           date?: string;
-          pluggy_transaction_id?: string | null;
+          import_key?: string | null;
+          import_source?: string | null;
+          import_memo?: string | null;
+          custom_name?: string | null;
+          notes?: string | null;
+          ofx_fitid?: string | null;
+          bank_import_id?: string | null;
+          statement_seq?: number | null;
           created_at?: string;
         };
         Update: {
@@ -115,7 +126,14 @@ export interface Database {
           amount?: number;
           type?: string;
           date?: string;
-          pluggy_transaction_id?: string | null;
+          import_key?: string | null;
+          import_source?: string | null;
+          import_memo?: string | null;
+          custom_name?: string | null;
+          notes?: string | null;
+          ofx_fitid?: string | null;
+          bank_import_id?: string | null;
+          statement_seq?: number | null;
           created_at?: string;
         };
         Relationships: [];
@@ -227,6 +245,51 @@ export interface Database {
           due_day?: number;
           color?: string;
           card_limit?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      bank_imports: {
+        Row: {
+          id: string;
+          user_id: string;
+          account_id: string | null;
+          source: string;
+          file_name: string | null;
+          period_start: string | null;
+          period_end: string | null;
+          tx_total: number;
+          tx_imported: number;
+          tx_skipped: number;
+          balance: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          account_id?: string | null;
+          source: string;
+          file_name?: string | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          tx_total?: number;
+          tx_imported?: number;
+          tx_skipped?: number;
+          balance?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          account_id?: string | null;
+          source?: string;
+          file_name?: string | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          tx_total?: number;
+          tx_imported?: number;
+          tx_skipped?: number;
+          balance?: number | null;
           created_at?: string;
         };
         Relationships: [];
