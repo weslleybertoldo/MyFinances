@@ -77,7 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const email = session.user.email?.toLowerCase();
         if (email !== ALLOWED_EMAIL) {
           signingOut.current = true;
-          supabase.auth.signOut().then(() => {
+          // scope local pelo mesmo motivo do signOut manual: nao derrubar a sessao
+          // desse usuario em outro app do mesmo Supabase (RLS ja barra os dados aqui).
+          supabase.auth.signOut({ scope: "local" }).then(() => {
             signingOut.current = false;
           }).catch(() => {
             signingOut.current = false;
@@ -129,7 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     signingOut.current = true;
     try {
-      await supabase.auth.signOut();
+      // scope local: o Supabase e compartilhado com o Painel de Controle — signOut
+      // global revogaria a sessao do outro app tambem.
+      await supabase.auth.signOut({ scope: "local" });
     } catch (e) {
       console.warn("[Auth] Erro ao fazer signOut:", e);
     } finally {
