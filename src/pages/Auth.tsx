@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { RefreshCw } from "lucide-react";
 import { CURRENT_VERSION } from "@/components/UpdateChecker";
 
 export default function Auth() {
-  const { signInWithGoogle } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,6 +20,12 @@ export default function Auth() {
       setError(error);
     }
   };
+
+  // Sessao ativa mas a rota continua em /auth: no APK o login vem por deep link,
+  // que nao navega. Sem este redirect o app fica preso na tela de login.
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
