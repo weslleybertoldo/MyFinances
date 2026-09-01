@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { Capacitor } from "@capacitor/core";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, Trash2, Upload, ChevronDown, ChevronUp, Mail } from "lucide-react";
@@ -11,6 +12,10 @@ import { decodeOfx, parseOfx, OfxParseError } from "@/lib/ofx";
 import { importOfxStatement, type ImportResult } from "@/lib/ofxImport";
 import { BankImportPanel, LastImportSummary } from "@/components/BankImportPanel";
 import { PageLoader } from "@/components/PageLoader";
+
+// No APK nao existe backend no localhost do Capacitor — URL relativa devolvia o
+// index.html ("resposta inesperada do servidor"). Nativo chama a prod direto.
+const API_BASE = Capacitor.isNativePlatform() ? "https://myfinances-app.vercel.app" : "";
 
 export default function Banks() {
   const { data: accounts = [], isPending } = useAccounts();
@@ -71,7 +76,7 @@ export default function Banks() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("sessão expirada — entre de novo");
 
-      const res = await fetch("/api/ofx-email-sync", {
+      const res = await fetch(`${API_BASE}/api/ofx-email-sync`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });

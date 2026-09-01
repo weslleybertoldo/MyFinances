@@ -25,10 +25,23 @@ const GMAIL_QUERY = "from:no-reply@inter.co filename:ofx newer_than:90d";
 const MAX_MESSAGES = 10;
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
+// CORS liberado: o APK roda em https://localhost (WebView do Capacitor) e chama
+// esta function cross-origin. Sem cookies (auth e por Bearer token), entao "*"
+// e seguro — a autorizacao real e o CRON_SECRET/JWT validado no handler.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, content-type",
+};
+
+export async function OPTIONS(): Promise<Response> {
+  return new Response(null, { status: 204, headers: CORS });
+}
+
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...CORS },
   });
 }
 
