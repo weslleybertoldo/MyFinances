@@ -33,9 +33,6 @@ export function mapAccount(row: AccountRow): BankAccount {
     bank: row.bank,
     balance: Number(row.balance),
     color: row.color,
-    connected: row.connected,
-    pluggyItemId: row.pluggy_item_id,
-    pluggyAccountId: row.pluggy_account_id,
   };
 }
 
@@ -45,6 +42,9 @@ export function mapTransaction(row: TransactionRow, catMap: CategoryMap): Transa
   return {
     id: row.id,
     description: row.description,
+    customName: row.custom_name,
+    displayName: row.custom_name?.trim() || row.description,
+    notes: row.notes,
     amount: row.type === "expense" ? -Math.abs(amount) : Math.abs(amount),
     date: row.date,
     category: cat?.name ?? "Sem categoria",
@@ -52,6 +52,8 @@ export function mapTransaction(row: TransactionRow, catMap: CategoryMap): Transa
     categoryId: row.category_id,
     accountId: row.account_id,
     type: row.type as "income" | "expense",
+    importSource: (row.import_source as "manual" | "email" | null) ?? null,
+    importMemo: row.import_memo,
   };
 }
 

@@ -4,14 +4,18 @@ export interface BankAccount {
   bank: string;
   balance: number;
   color: string;
-  connected: boolean;
-  pluggyItemId: string | null;
-  pluggyAccountId: string | null;
 }
 
 export interface Transaction {
   id: string;
+  /** Nome ORIGINAL (do extrato importado ou o digitado na criacao). Nunca sobrescrito. */
   description: string;
+  /** Nome escolhido pelo usuario; null = usa o original. */
+  customName: string | null;
+  /** O que a lista mostra: customName ?? description. */
+  displayName: string;
+  /** Observacao livre do usuario. */
+  notes: string | null;
   amount: number;
   date: string;
   category: string;
@@ -19,6 +23,9 @@ export interface Transaction {
   categoryId: string | null;
   accountId: string;
   type: "income" | "expense";
+  /** Detalhe da importacao (null em transacao manual). */
+  importSource: "manual" | "email" | null;
+  importMemo: string | null;
 }
 
 export interface FutureLaunch {

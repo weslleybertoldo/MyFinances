@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { Pencil, Trash2, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
 import { useUpdateFutureLaunch, useDeleteFutureLaunch, useDeleteFutureLaunchGroup } from "@/hooks/useFutureLaunches";
 import { useCategories } from "@/hooks/useCategories";
@@ -23,10 +23,20 @@ export default function DashboardFutureModal({ open, onOpenChange, launches }: P
   const { data: categories = [] } = useCategories();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ description: "", amount: "", due_date: "", category_id: "", type: "expense" as "income" | "expense" });
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string; groupId: string | null } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; groupId: string | null; recurring: boolean } | null>(null);
+  // Meses fechados por padrao — clica no mes pra expandir.
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+
+  const toggleMonth = (month: string) =>
+    setExpandedMonths((cur) => {
+      const next = new Set(cur);
+      if (next.has(month)) next.delete(month);
+      else next.add(month);
+      return next;
+    });
 
   const handleOpenChange = (v: boolean) => {
-    if (!v) { setEditingId(null); setConfirmDelete(null); }
+    if (!v) { setEditingId(null); setConfirmDelete(null); setExpandedMonths(new Set()); }
     onOpenChange(v);
   };
 
@@ -56,7 +66,7 @@ export default function DashboardFutureModal({ open, onOpenChange, launches }: P
 
   const handleDelete = (l: FutureLaunch) => {
     if (l.groupId || l.recurring) {
-      setConfirmDelete({ id: l.id, groupId: l.groupId });
+      setConfirmDelete({ id: l.id, groupId: l.groupId, recurring: l.recurring });
     } else {
       deleteLaunch.mutate(l.id);
     }
@@ -98,10 +108,24 @@ export default function DashboardFutureModal({ open, onOpenChange, launches }: P
             <div className="space-y-4">
               {[...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, items]) => (
                 <div key={month}>
-                  <h3 className="text-sm font-semibold text-muted-foreground capitalize mb-2">
-                    {formatMonthHeader(month)}
-                  </h3>
-                  <div className="space-y-2">
+                  <button
+                    className="w-full flex items-center justify-between rounded-lg border bg-zinc-300/80 hover:bg-zinc-300 dark:bg-zinc-700/70 dark:hover:bg-zinc-700 text-foreground px-3 py-2 transition-colors"
+                    onClick={() => toggleMonth(month)}
+                    aria-expanded={expandedMonths.has(month)}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-semibold capitalize">
+                      {expandedMonths.has(month) ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      {formatMonthHeader(month)}
+                    </span>
+                    <span className="text-sm font-semibold text-destructive">
+                      {formatCurrency(items.reduce((s, l) => s + l.amount, 0))}
+                    </span>
+                  </button>
+                  <div className={`space-y-2 mt-2 ${expandedMonths.has(month) ? "" : "hidden"}`}>
                     {items.map((l) => (
                       <div key={l.id} className="border rounded-lg p-3">
                         {editingId === l.id ? (
@@ -164,20 +188,34 @@ export default function DashboardFutureModal({ open, onOpenChange, launches }: P
         </DialogContent>
       </Dialog>
 
-      {/* Confirmação de delete grupo */}
+      {/* Confirmação de delete grupo (parcelas/recorrente) */}
       <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Excluir todas as parcelas?
+              {confirmDelete?.recurring ? "Excluir este mês ou a recorrência?" : "Excluir parcela ou tudo?"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Se você excluir, todas as parcelas deste lançamento serão removidas (incluindo parcelas de meses anteriores e futuros).
+            {confirmDelete?.recurring
+              ? "Você pode excluir somente este mês (não volta na renovação automática) ou encerrar a recorrência inteira (meses anteriores e futuros)."
+              : "Você pode excluir somente esta parcela (só este mês) ou todas as parcelas deste lançamento (incluindo meses anteriores e futuros)."}
           </p>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
+            {confirmDelete?.groupId && (
+              <Button
+                variant="outline"
+                className="border-destructive text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  deleteLaunch.mutate(confirmDelete.id);
+                  setConfirmDelete(null);
+                }}
+              >
+                Excluir só esta
+              </Button>
+            )}
             <Button variant="destructive" onClick={confirmDeleteAction}>Excluir Todas</Button>
           </div>
         </DialogContent>
