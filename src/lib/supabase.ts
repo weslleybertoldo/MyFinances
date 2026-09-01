@@ -1,8 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// trim(): env com \n/espaco no fim ja aconteceu DUAS vezes (Vercel production e
+// possivelmente o secret do GitHub do APK). O navegador ignora \n dentro de URL
+// (o app "funciona"), mas quebra silenciosamente qualquer comparacao de string
+// com a URL — foi o que desligou o fallback /sb em prod na v1.9.1.
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ?? "";
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() ?? "";
 
 // Schema do ambiente: "public" (prod) ou "staging". Dirige PostgREST.
 export const DB_SCHEMA = (import.meta.env.VITE_DB_SCHEMA as string) || "public";
@@ -12,7 +16,7 @@ export const DB_SCHEMA = (import.meta.env.VITE_DB_SCHEMA as string) || "public";
 // resolve *.supabase.co mas resolve vercel.app — o site abre e o APK ficava no
 // spinner infinito. Nao e segredo: mesma anon key + RLS do caminho direto.
 const supabaseProxyUrl =
-  (import.meta.env.VITE_SUPABASE_PROXY_URL as string | undefined) ||
+  (import.meta.env.VITE_SUPABASE_PROXY_URL as string | undefined)?.trim() ||
   "https://myfinances-app.vercel.app/sb";
 
 if (!supabaseUrl || !supabaseAnonKey) {
