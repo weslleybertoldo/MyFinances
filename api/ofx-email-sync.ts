@@ -11,10 +11,12 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Buffer } from "node:buffer";
+// Extensao .js nos imports relativos e OBRIGATORIA: o runtime da Vercel roda
+// node ESM (package.json type:module) e nao resolve import sem extensao.
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "../src/lib/database.types";
-import { decodeOfx, parseOfx } from "../src/lib/ofx";
-import { importOfxStatement, type ImportClient, type ImportResult } from "../src/lib/ofxImport";
+import type { Database } from "../src/lib/database.types.js";
+import { decodeOfx, parseOfx } from "../src/lib/ofx.js";
+import { importOfxStatement, type ImportClient, type ImportResult } from "../src/lib/ofxImport.js";
 
 export const config = { maxDuration: 60 };
 

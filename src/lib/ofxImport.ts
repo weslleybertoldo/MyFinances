@@ -7,8 +7,8 @@
 // functions da Vercel.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "./database.types";
-import type { OfxStatement } from "./ofx";
+import type { Database } from "./database.types.js";
+import type { OfxStatement } from "./ofx.js";
 
 export type ImportSource = "manual" | "email";
 
