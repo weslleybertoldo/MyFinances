@@ -10,11 +10,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, CalendarClock, TrendingUp, TrendingDown, Check, AlertTriangle, Pencil, ChevronLeft, ChevronRight, CreditCard, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
 import { useFutureLaunches, useCreateFutureLaunch, useUpdateFutureLaunch, useUpdateFutureLaunchGroup, useDeleteFutureLaunch, useDeleteFutureLaunchGroup, useClearCardFromGroup } from "@/hooks/useFutureLaunches";
-import { useTotalBalance } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreditCards, useInvoicePayments, useToggleInvoicePayment } from "@/hooks/useCreditCards";
 import DashboardPendingModal from "@/components/DashboardPendingModal";
 import DashboardFutureModal from "@/components/DashboardFutureModal";
+import MonthExpensesModal from "@/components/MonthExpensesModal";
+import { PageLoader } from "@/components/PageLoader";
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -28,9 +29,13 @@ function getMonthLabel(monthStr: string) {
 }
 
 export default function FutureLaunches() {
-  const { data: allLaunches = [], isLoading } = useFutureLaunches();
+  const { data: allLaunches = [], isPending } = useFutureLaunches();
   const { data: categories = [] } = useCategories();
-  const currentBalance = useTotalBalance();
+  // Aba independente por decisao do Weslley (01/09/2026): Lancamentos/Cartoes/Projetos
+  // sao o mundo MANUAL e nao consomem o saldo importado do extrato — esse alimenta so
+  // Dashboard e Transacoes. Sem isso, a sobra das receitas recebidas contava DUAS vezes
+  // no Saldo Projetado (uma nas Receitas Previstas, outra dentro do saldo da conta).
+  const currentBalance = 0;
   const createLaunch = useCreateFutureLaunch();
   const { data: creditCards = [] } = useCreditCards();
   const { data: invoicePayments = [] } = useInvoicePayments();
@@ -47,7 +52,8 @@ export default function FutureLaunches() {
   const [showAdd, setShowAdd] = useState(false);
   const [showPending, setShowPending] = useState(false);
   const [showFuture, setShowFuture] = useState(false);
-  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ id: string; groupId: string } | null>(null);
+  const [showMonthExpenses, setShowMonthExpenses] = useState(false);
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ id: string; groupId: string; recurring: boolean } | null>(null);
   const [confirmDeleteSingle, setConfirmDeleteSingle] = useState<string | null>(null);
   const [confirmUpdateGroup, setConfirmUpdateGroup] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,6 +102,9 @@ export default function FutureLaunches() {
   const monthIncome = Math.max(0, monthIncomePaid - monthExpensePaidBalance - paidInvoicesThisMonth);
   // Despesas Previstas = despesas ainda não pagas
   const monthExpense = monthLaunches.filter((l) => l.type === "expense" && !l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
+  // Card "Despesas": pagas (realizadas) em destaque; previstas e total previsto embaixo.
+  const monthExpensePaidAll = monthLaunches.filter((l) => l.type === "expense" && l.paid).reduce((s, l) => s + Math.abs(l.amount), 0);
+  const monthExpenseTotal = monthExpensePaidAll + monthExpense;
 
   // Calcula o mês de VENCIMENTO da fatura para uma despesa
   // Ex: closingDay=29, dueDay=5 → compra dia 2/abr (antes do fechamento 29/abr) → fatura vence 5/mai → mês "2026-05"
@@ -320,7 +329,7 @@ export default function FutureLaunches() {
 
   const removeLaunch = (l: typeof forecast[0]) => {
     if (l.groupId) {
-      setConfirmDeleteGroup({ id: l.id, groupId: l.groupId });
+      setConfirmDeleteGroup({ id: l.id, groupId: l.groupId, recurring: l.recurring });
     } else {
       setConfirmDeleteSingle(l.id);
     }
@@ -336,15 +345,8 @@ export default function FutureLaunches() {
     new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Maceio" })
       .format(new Date(d + (d.includes("T") ? "" : "T12:00:00")));
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Lançamentos Futuros</h1>
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
+  if (isPending) {
+    return <PageLoader title="Lançamentos" />;
   }
 
   return (
@@ -439,13 +441,18 @@ export default function FutureLaunches() {
             <p className="text-base sm:text-lg font-bold text-success">{formatCurrency(monthIncome)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setShowMonthExpenses(true)}
+        >
           <CardContent className="pt-3 px-3">
             <div className="flex items-center gap-1 mb-1">
               <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-destructive flex-shrink-0" />
-              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Despesas Previstas</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Despesas</p>
             </div>
-            <p className="text-base sm:text-lg font-bold text-destructive">{formatCurrency(monthExpense)}</p>
+            <p className="text-base sm:text-lg font-bold text-destructive">{formatCurrency(monthExpensePaidAll)}</p>
+            <p className="text-[10px] text-muted-foreground">previstas: {formatCurrency(monthExpense)}</p>
+            <p className="text-[10px] text-muted-foreground">total previsto: {formatCurrency(monthExpenseTotal)}</p>
           </CardContent>
         </Card>
         <Card
@@ -685,6 +692,13 @@ export default function FutureLaunches() {
       {/* Modais */}
       <DashboardPendingModal open={showPending} onOpenChange={setShowPending} launches={pendingLaunches} />
       <DashboardFutureModal open={showFuture} onOpenChange={setShowFuture} launches={futureLaunches} />
+      <MonthExpensesModal
+        open={showMonthExpenses}
+        onOpenChange={setShowMonthExpenses}
+        monthLabel={getMonthLabel(selectedMonth)}
+        pending={monthLaunches.filter((l) => l.type === "expense" && !l.paid)}
+        paid={monthLaunches.filter((l) => l.type === "expense" && l.paid)}
+      />
 
       {/* Dialog de confirmação para deletar lançamento avulso */}
       <Dialog open={!!confirmDeleteSingle} onOpenChange={() => setConfirmDeleteSingle(null)}>
@@ -704,20 +718,34 @@ export default function FutureLaunches() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* Dialog de confirmação para deletar grupo */}
+      {/* Dialog de confirmação para deletar grupo (parcelas/recorrente) */}
       <Dialog open={!!confirmDeleteGroup} onOpenChange={() => setConfirmDeleteGroup(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Excluir todas as parcelas?
+              {confirmDeleteGroup?.recurring ? "Excluir este mês ou a recorrência?" : "Excluir parcela ou tudo?"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Se você excluir, todas as parcelas deste lançamento serão removidas (incluindo parcelas de meses anteriores e futuros).
+            {confirmDeleteGroup?.recurring
+              ? "Você pode excluir somente este mês (não volta na renovação automática) ou encerrar a recorrência inteira (meses anteriores e futuros)."
+              : "Você pode excluir somente esta parcela (só este mês) ou todas as parcelas deste lançamento (incluindo meses anteriores e futuros)."}
           </p>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmDeleteGroup(null)}>Cancelar</Button>
+            {confirmDeleteGroup && (
+              <Button
+                variant="outline"
+                className="border-destructive text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  if (confirmDeleteGroup) deleteLaunch.mutate(confirmDeleteGroup.id);
+                  setConfirmDeleteGroup(null);
+                }}
+              >
+                Excluir só esta
+              </Button>
+            )}
             <Button variant="destructive" onClick={handleConfirmDeleteGroup}>Excluir Todas</Button>
           </div>
         </DialogContent>

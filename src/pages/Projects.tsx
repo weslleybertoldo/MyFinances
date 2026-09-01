@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageLoader } from "@/components/PageLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import {
 } from "@/hooks/useProjects";
 
 export default function Projects() {
-  const { data: projects = [], isLoading } = useProjects();
+  const { data: projects = [], isPending } = useProjects();
   const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
   const updateProject = useUpdateProject();
@@ -74,13 +75,8 @@ export default function Projects() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-xl font-bold">Projetos Futuros</h1>
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
+  if (isPending) {
+    return <PageLoader title="Projetos Futuros" />;
   }
 
   return (

@@ -29,7 +29,14 @@ export function useTransactions(filters?: TransactionFilters) {
         .from("transactions")
         .select("*")
         .eq("user_id", user!.id)
+        // Dentro do dia, a ordem e a do EXTRATO (statement_seq vem do FITID do OFX;
+        // maior = mais tarde no dia). Transacao manual (seq null) fica no topo do dia.
+        // created_at/id sao desempate estavel — so por date, o Postgres reordenava
+        // linhas do mesmo dia a cada UPDATE e a lista "pulava" ao editar.
         .order("date", { ascending: false })
+        .order("statement_seq", { ascending: false, nullsFirst: true })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (filters?.month) {
@@ -45,8 +52,15 @@ export function useTransactions(filters?: TransactionFilters) {
       }
 
       if (filters?.search) {
-        const escaped = filters.search.replace(/%/g, "\\%").replace(/_/g, "\\_");
-        query = query.ilike("description", `%${escaped}%`);
+        // Aspas saem porque o pattern vai entre aspas na sintaxe do or() do PostgREST.
+        const escaped = filters.search
+          .replace(/%/g, "\\%")
+          .replace(/_/g, "\\_")
+          .replace(/"/g, " ");
+        // Busca tanto no nome original quanto no nome editado pelo usuario.
+        query = query.or(
+          `description.ilike."%${escaped}%",custom_name.ilike."%${escaped}%"`
+        );
       }
 
       const { data, error } = await query;
@@ -58,7 +72,7 @@ export function useTransactions(filters?: TransactionFilters) {
   });
 }
 
-// Extrai pattern reutilizavel da descricao bruta da transacao Pluggy.
+// Extrai pattern reutilizavel da descricao bruta da transacao importada.
 // Pega ate 3 tokens alfabeticos com >= 4 chars, ignora stopwords e numeros.
 // Ex: "COMPRA CARTAO IFOOD 12/04 R$25,90" -> "ifood"
 const STOPWORDS = new Set([
@@ -102,6 +116,36 @@ export function useUpdateTransactionCategory() {
           { onConflict: "user_id,pattern" }
         );
       if (ruleError) throw ruleError;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
+  });
+}
+
+export function useUpdateTransactionDetails() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      transactionId,
+      originalDescription,
+      customName,
+      notes,
+    }: {
+      transactionId: string;
+      originalDescription: string;
+      customName: string;
+      notes: string;
+    }) => {
+      const nome = customName.trim();
+      const { error } = await supabase
+        .from("transactions")
+        .update({
+          // Igual ao original (ou vazio) = volta a usar o original.
+          custom_name: nome && nome !== originalDescription ? nome : null,
+          notes: notes.trim() || null,
+        })
+        .eq("id", transactionId);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
   });

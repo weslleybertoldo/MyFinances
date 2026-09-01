@@ -50,7 +50,7 @@ export function useUpdateAccount() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; balance?: number; connected?: boolean; name?: string }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; balance?: number; name?: string }) => {
       const { error } = await supabase.from("accounts").update(updates).eq("id", id);
       if (error) throw error;
     },

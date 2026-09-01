@@ -36,8 +36,12 @@ async function seedCategories(userId: string) {
       .eq("user_id", userId);
 
     if (count === 0) {
-      await supabase.from("categories").insert(
-        DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId }))
+      // Upsert por (user_id, name): esta funcao roda em 3 gatilhos de login que correm
+      // entre si — com insert puro, os 3 liam count=0 e cada um inseria as 10 categorias
+      // padrao (30 no total). O indice unico + ignoreDuplicates torna a corrida inocua.
+      await supabase.from("categories").upsert(
+        DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId })),
+        { onConflict: "user_id,name", ignoreDuplicates: true }
       );
     }
   } catch (e) {
