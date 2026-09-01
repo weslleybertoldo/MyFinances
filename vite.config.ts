@@ -16,6 +16,15 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // Dev local com as functions da Vercel: o proxy do `vercel dev` devolve 404
+    // pra requests com Sec-Fetch-Dest (modulos do proprio Vite), entao rodamos o
+    // Vite direto e apontamos /api pro `vercel dev` em outra porta:
+    //   API_PROXY_TARGET=http://localhost:5191 npx vite --port 5190
+    // DEV_ALLOWED_HOST libera um host de tunel (ex. cloudflared) pra testar no celular.
+    proxy: process.env.API_PROXY_TARGET
+      ? { "/api": { target: process.env.API_PROXY_TARGET, changeOrigin: true } }
+      : undefined,
+    allowedHosts: process.env.DEV_ALLOWED_HOST ? [process.env.DEV_ALLOWED_HOST] : undefined,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

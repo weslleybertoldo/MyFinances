@@ -262,6 +262,7 @@ export interface Database {
           tx_imported: number;
           tx_skipped: number;
           balance: number | null;
+          gmail_message_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -276,6 +277,7 @@ export interface Database {
           tx_imported?: number;
           tx_skipped?: number;
           balance?: number | null;
+          gmail_message_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -290,6 +292,7 @@ export interface Database {
           tx_imported?: number;
           tx_skipped?: number;
           balance?: number | null;
+          gmail_message_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
