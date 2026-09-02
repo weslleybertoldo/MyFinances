@@ -1,4 +1,4 @@
-import { LayoutDashboard, ArrowLeftRight, CalendarClock, Link2, LogOut, Settings, FolderKanban, CreditCard } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, CalendarClock, Link2, LogOut, Settings, FolderKanban, CreditCard, TrendingUp } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -19,6 +19,7 @@ const items = [
   { title: "Lançamentos", url: "/lancamentos", icon: CalendarClock },
   { title: "Cartões", url: "/cartoes", icon: CreditCard },
   { title: "Projetos", url: "/projetos", icon: FolderKanban },
+  { title: "Investimentos", url: "/investimentos", icon: TrendingUp },
   { title: "Bancos", url: "/bancos", icon: Link2 },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
