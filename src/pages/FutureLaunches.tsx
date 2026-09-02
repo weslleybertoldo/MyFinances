@@ -4,17 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, CalendarClock, TrendingUp, TrendingDown, Check, AlertTriangle, Pencil, ChevronLeft, ChevronRight, CreditCard, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/mock-data";
-import { useFutureLaunches, useCreateFutureLaunch, useUpdateFutureLaunch, useUpdateFutureLaunchGroup, useDeleteFutureLaunch, useDeleteFutureLaunchGroup, useClearCardFromGroup } from "@/hooks/useFutureLaunches";
+import { useFutureLaunches, useUpdateFutureLaunch, useUpdateFutureLaunchGroup, useDeleteFutureLaunch, useDeleteFutureLaunchGroup, useClearCardFromGroup } from "@/hooks/useFutureLaunches";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreditCards, useInvoicePayments, useToggleInvoicePayment } from "@/hooks/useCreditCards";
 import DashboardPendingModal from "@/components/DashboardPendingModal";
 import DashboardFutureModal from "@/components/DashboardFutureModal";
 import MonthExpensesModal from "@/components/MonthExpensesModal";
+import NewLaunchDialog from "@/components/NewLaunchDialog";
 import { PageLoader } from "@/components/PageLoader";
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -36,7 +36,6 @@ export default function FutureLaunches() {
   // Dashboard e Transacoes. Sem isso, a sobra das receitas recebidas contava DUAS vezes
   // no Saldo Projetado (uma nas Receitas Previstas, outra dentro do saldo da conta).
   const currentBalance = 0;
-  const createLaunch = useCreateFutureLaunch();
   const { data: creditCards = [] } = useCreditCards();
   const { data: invoicePayments = [] } = useInvoicePayments();
   const toggleInvoicePayment = useToggleInvoicePayment();
@@ -61,17 +60,6 @@ export default function FutureLaunches() {
   const [payDialog, setPayDialog] = useState<{ id: string; groupId: string | null } | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string>("");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
-
-  const [newLaunch, setNewLaunch] = useState({
-    description: "",
-    amount: "",
-    dueDate: "",
-    categoryId: "",
-    type: "expense" as "income" | "expense",
-    recurring: false,
-    installments: "",
-    cardId: "",
-  });
 
   // Filter by selected month
   const monthLaunches = allLaunches.filter((l) => l.dueDate.substring(0, 7) === selectedMonth);
@@ -229,23 +217,6 @@ export default function FutureLaunches() {
     });
   };
 
-  const handleAdd = () => {
-    if (!newLaunch.description || !newLaunch.amount || !newLaunch.dueDate) return;
-    const installments = parseInt(newLaunch.installments) || undefined;
-    createLaunch.mutate({
-      description: newLaunch.description,
-      amount: parseFloat(newLaunch.amount),
-      type: newLaunch.type,
-      due_date: newLaunch.dueDate,
-      category_id: newLaunch.categoryId || undefined,
-      card_id: (newLaunch.cardId && newLaunch.cardId !== "none") ? newLaunch.cardId : undefined,
-      recurring: installments ? false : newLaunch.recurring,
-      installments,
-    });
-    setNewLaunch({ description: "", amount: "", dueDate: "", categoryId: "", type: "expense", recurring: false, installments: "", cardId: "" });
-    setShowAdd(false);
-  };
-
   const startEdit = (l: typeof forecast[0]) => {
     setEditingId(l.id);
     setEditForm({
@@ -355,69 +326,7 @@ export default function FutureLaunches() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Lançamentos</h1>
-          <Dialog open={showAdd} onOpenChange={setShowAdd}>
-            <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Novo</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Lançamento Futuro</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input placeholder="Descrição" value={newLaunch.description} onChange={(e) => setNewLaunch({ ...newLaunch, description: e.target.value })} />
-                <Input type="number" placeholder="Valor" value={newLaunch.amount} onChange={(e) => setNewLaunch({ ...newLaunch, amount: e.target.value })} />
-                <Input type="date" value={newLaunch.dueDate} onChange={(e) => setNewLaunch({ ...newLaunch, dueDate: e.target.value })} />
-                <Select value={newLaunch.categoryId} onValueChange={(v) => setNewLaunch({ ...newLaunch, categoryId: v })}>
-                  <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={newLaunch.type} onValueChange={(v: "income" | "expense") => setNewLaunch({ ...newLaunch, type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                    <SelectItem value="income">Receita</SelectItem>
-                  </SelectContent>
-                </Select>
-                {!newLaunch.recurring && (
-                  <div>
-                    <Input type="number" placeholder="Número de parcelas (ex: 10)" min={2} max={60} value={newLaunch.installments} onChange={(e) => setNewLaunch({ ...newLaunch, installments: e.target.value })} />
-                    {newLaunch.installments && parseInt(newLaunch.installments) > 1 && newLaunch.amount && (
-                      <p className="text-xs text-muted-foreground mt-1">{newLaunch.installments}x de {formatCurrency(parseFloat(newLaunch.amount))}</p>
-                    )}
-                  </div>
-                )}
-                {!newLaunch.installments && (
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={newLaunch.recurring} onCheckedChange={(v) => setNewLaunch({ ...newLaunch, recurring: !!v })} />
-                    <span className="text-sm">Recorrente (mensal)</span>
-                  </div>
-                )}
-                {newLaunch.type === "expense" && creditCards.length > 0 && (
-                  <Select value={newLaunch.cardId} onValueChange={(v) => setNewLaunch({ ...newLaunch, cardId: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sem cartão (saldo)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sem cartão (saldo)</SelectItem>
-                      {creditCards.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
-                            {c.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button className="w-full" onClick={handleAdd} disabled={createLaunch.isPending}>
-                  {createLaunch.isPending ? "Adicionando..." : "Adicionar"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="h-4 w-4 mr-1" />Novo</Button>
         </div>
         <div className="flex items-center justify-center gap-2">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={prevMonth}>
@@ -699,6 +608,8 @@ export default function FutureLaunches() {
         pending={monthLaunches.filter((l) => l.type === "expense" && !l.paid)}
         paid={monthLaunches.filter((l) => l.type === "expense" && l.paid)}
       />
+      {/* Form "Novo Lancamento Futuro" — compartilhado com o botao "+" de Transacoes */}
+      <NewLaunchDialog open={showAdd} onOpenChange={setShowAdd} />
 
       {/* Dialog de confirmação para deletar lançamento avulso */}
       <Dialog open={!!confirmDeleteSingle} onOpenChange={() => setConfirmDeleteSingle(null)}>
