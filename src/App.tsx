@@ -16,6 +16,7 @@ const FutureLaunches = lazy(() => import("@/pages/FutureLaunches"));
 const Banks = lazy(() => import("@/pages/Banks"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const Projects = lazy(() => import("@/pages/Projects"));
+const Investments = lazy(() => import("@/pages/Investments"));
 const CreditCardsPage = lazy(() => import("@/pages/CreditCards"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
@@ -62,6 +63,7 @@ const App = () => (
                               <Route path="/lancamentos" element={<FutureLaunches />} />
                               <Route path="/cartoes" element={<CreditCardsPage />} />
                               <Route path="/projetos" element={<Projects />} />
+                              <Route path="/investimentos" element={<Investments />} />
                               <Route path="/bancos" element={<Banks />} />
                               <Route path="/configuracoes" element={<Settings />} />
                               <Route path="*" element={<NotFound />} />

@@ -321,6 +321,150 @@ export interface Database {
         };
         Relationships: [];
       };
+      investment_assets: {
+        Row: {
+          id: string;
+          user_id: string;
+          ticker: string;
+          name: string | null;
+          asset_class: string;
+          score: number;
+          tesouro_tipo: string | null;
+          tesouro_vencimento: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          ticker: string;
+          name?: string | null;
+          asset_class: string;
+          score?: number;
+          tesouro_tipo?: string | null;
+          tesouro_vencimento?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          ticker?: string;
+          name?: string | null;
+          asset_class?: string;
+          score?: number;
+          tesouro_tipo?: string | null;
+          tesouro_vencimento?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      investment_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          asset_id: string;
+          kind: string;
+          date: string;
+          quantity: number;
+          unit_price: number;
+          total: number;
+          notes: string | null;
+          source: string;
+          external_key: string | null;
+          ignored: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          asset_id: string;
+          kind: string;
+          date: string;
+          quantity?: number;
+          unit_price?: number;
+          total: number;
+          notes?: string | null;
+          source?: string;
+          external_key?: string | null;
+          ignored?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          asset_id?: string;
+          kind?: string;
+          date?: string;
+          quantity?: number;
+          unit_price?: number;
+          total?: number;
+          notes?: string | null;
+          source?: string;
+          external_key?: string | null;
+          ignored?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      investment_quotes: {
+        Row: {
+          ticker: string;
+          asset_class: string | null;
+          name: string | null;
+          price: number | null;
+          price_at: string | null;
+          change_pct: number | null;
+          source: string | null;
+          history: Json;
+          dividends: Json;
+          error: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          ticker: string;
+          asset_class?: string | null;
+          name?: string | null;
+          price?: number | null;
+          price_at?: string | null;
+          change_pct?: number | null;
+          source?: string | null;
+          history?: Json;
+          dividends?: Json;
+          error?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          ticker?: string;
+          asset_class?: string | null;
+          name?: string | null;
+          price?: number | null;
+          price_at?: string | null;
+          change_pct?: number | null;
+          source?: string | null;
+          history?: Json;
+          dividends?: Json;
+          error?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      investment_class_targets: {
+        Row: {
+          user_id: string;
+          asset_class: string;
+          target_pct: number;
+        };
+        Insert: {
+          user_id: string;
+          asset_class: string;
+          target_pct?: number;
+        };
+        Update: {
+          user_id?: string;
+          asset_class?: string;
+          target_pct?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
