@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/mock-data";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreditCards } from "@/hooks/useCreditCards";
 import { useCreateFutureLaunch } from "@/hooks/useFutureLaunches";
+import type { Category, CreditCard } from "@/lib/types";
 
 export type LaunchStatus = "pending" | "paid";
 
@@ -61,6 +62,12 @@ function buildInitial(prefill?: NewLaunchPrefill): FormState {
  * Transacoes. Componente unico pra os dois caminhos nao divergirem.
  */
 export default function NewLaunchDialog({ open, onOpenChange, prefill, onCreated }: NewLaunchDialogProps) {
+  // Buscadas aqui (componente montado junto com a pagina), nao no form: assim os
+  // dados ja estao em cache quando o dialog abre e o select de cartao nao "pula"
+  // pra dentro do form meio segundo depois (acontecia em Transacoes, que nao usa
+  // cartoes em mais nada).
+  const { data: categories = [] } = useCategories();
+  const { data: creditCards = [] } = useCreditCards();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -72,6 +79,8 @@ export default function NewLaunchDialog({ open, onOpenChange, prefill, onCreated
             manual e sem o conteudo sumir no meio da animacao de saida. */}
         <NewLaunchForm
           prefill={prefill}
+          categories={categories}
+          creditCards={creditCards}
           onDone={() => {
             onCreated?.();
             onOpenChange(false);
@@ -82,9 +91,14 @@ export default function NewLaunchDialog({ open, onOpenChange, prefill, onCreated
   );
 }
 
-function NewLaunchForm({ prefill, onDone }: { prefill?: NewLaunchPrefill; onDone: () => void }) {
-  const { data: categories = [] } = useCategories();
-  const { data: creditCards = [] } = useCreditCards();
+interface NewLaunchFormProps {
+  prefill?: NewLaunchPrefill;
+  categories: Category[];
+  creditCards: CreditCard[];
+  onDone: () => void;
+}
+
+function NewLaunchForm({ prefill, categories, creditCards, onDone }: NewLaunchFormProps) {
   const createLaunch = useCreateFutureLaunch();
   const [form, setForm] = useState<FormState>(() => buildInitial(prefill));
   const patch = (changes: Partial<FormState>) => setForm((f) => ({ ...f, ...changes }));
