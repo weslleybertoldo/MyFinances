@@ -1,18 +1,20 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Search, Filter, Tag, Pencil, StickyNote, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Search, Filter, Tag, Pencil, Plus, StickyNote, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mock-data";
 import { useTransactions, useUpdateTransactionCategory, useUpdateTransactionDetails } from "@/hooks/useTransactions";
 import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { PageLoader } from "@/components/PageLoader";
-import { formatImportedAt, SOURCE_LABEL } from "@/hooks/useBankImports";
+import NewLaunchDialog, { type NewLaunchPrefill } from "@/components/NewLaunchDialog";
+import { SOURCE_LABEL } from "@/hooks/useBankImports";
 import type { Transaction } from "@/lib/types";
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -39,10 +41,21 @@ export default function Transactions() {
     const [y, m] = selectedMonth.split("-").map(Number);
     setSelectedMonth(getMonthStr(new Date(y, m, 1)));
   };
+
+  // Cada modal guarda a transacao SEPARADA do flag `open`. Se a transacao virasse
+  // null no fechar, o conteudo condicional sumia durante a animacao de saida do
+  // Radix (~200ms) e piscava um modal so com o titulo ("Detalhes da transacao"
+  // vazio). O flag fecha; a transacao fica ate a proxima abertura.
   const [detailsTx, setDetailsTx] = useState<Transaction | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [categoryTx, setCategoryTx] = useState<Transaction | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [launchPrefill, setLaunchPrefill] = useState<NewLaunchPrefill | undefined>(undefined);
+  const [launchOpen, setLaunchOpen] = useState(false);
 
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
@@ -62,16 +75,45 @@ export default function Transactions() {
   const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpense = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0);
 
+  // Versao "viva" da transacao do modal de categoria: depois de trocar, a lista
+  // recarrega e o destaque do botao acompanha a categoria nova.
+  const categoryTxLive = categoryTx ? (transactions.find((t) => t.id === categoryTx.id) ?? categoryTx) : null;
+
   const handleCategoryChange = (txId: string, categoryId: string, description: string) => {
     // A regra automatica e extraida do nome ORIGINAL: e nele que o trigger
     // auto_categorize da proxima importacao vai dar match.
     updateCategory.mutate({ transactionId: txId, categoryId, description });
   };
 
+  const openDetails = (t: Transaction) => {
+    setDetailsTx(t);
+    setDetailsOpen(true);
+  };
+
   const openEdit = (t: Transaction) => {
     setEditName(t.customName ?? t.description);
     setEditNotes(t.notes ?? "");
     setEditTx(t);
+    setEditOpen(true);
+  };
+
+  const openCategory = (t: Transaction) => {
+    setCategoryTx(t);
+    setCategoryOpen(true);
+  };
+
+  const openLaunchFrom = (t: Transaction) => {
+    setLaunchPrefill({
+      description: t.displayName,
+      amount: Math.abs(t.amount).toFixed(2),
+      dueDate: t.date.slice(0, 10),
+      categoryId: t.categoryId ?? "",
+      type: t.type,
+      // A transacao ja aconteceu no extrato, entao o lancamento nasce como pago;
+      // o seletor do form deixa trocar pra pendente.
+      status: "paid",
+    });
+    setLaunchOpen(true);
   };
 
   const saveEdit = () => {
@@ -83,7 +125,7 @@ export default function Transactions() {
         customName: editName,
         notes: editNotes,
       },
-      { onSuccess: () => setEditTx(null) }
+      { onSuccess: () => setEditOpen(false) }
     );
   };
 
@@ -169,11 +211,11 @@ export default function Transactions() {
               <div
                 key={t.id}
                 className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
-                onClick={() => setDetailsTx(t)}
+                onClick={() => openDetails(t)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") setDetailsTx(t);
+                  if (e.key === "Enter") openDetails(t);
                 }}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -192,42 +234,30 @@ export default function Transactions() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
+                      <button
+                        aria-label="Criar lançamento a partir desta transação"
+                        title="Criar lançamento"
+                        className="p-1 rounded flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-opacity sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openLaunchFrom(t);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">{formatDate(t.date)}</span>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <button
-                            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-accent transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Tag className="h-3 w-3" />
-                            {t.category}
-                          </button>
-                        </DialogTrigger>
-                        <DialogContent onClick={(e) => e.stopPropagation()}>
-                          <DialogHeader>
-                            <DialogTitle>Alterar Categoria</DialogTitle>
-                          </DialogHeader>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Transação: <strong>{t.displayName}</strong>
-                          </p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {categories.map((c) => (
-                              <Button
-                                key={c.id}
-                                variant={t.categoryId === c.id ? "default" : "outline"}
-                                size="sm"
-                                className="justify-start"
-                                onClick={() => handleCategoryChange(t.id, c.id, t.description)}
-                              >
-                                <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: c.color }} />
-                                {c.name}
-                              </Button>
-                            ))}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <button
+                        className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-accent transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCategory(t);
+                        }}
+                      >
+                        <Tag className="h-3 w-3" />
+                        {t.category}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -243,8 +273,49 @@ export default function Transactions() {
         </CardContent>
       </Card>
 
+      {/* Alterar categoria — fica FORA da linha da lista de proposito. O overlay do
+          Dialog e um portal, mas o React borbulha o clique pela arvore de componentes:
+          montado dentro da linha, o "clicar fora pra fechar" disparava o onClick da
+          linha e abria os Detalhes em vez de so fechar. */}
+      <Dialog open={categoryOpen} onOpenChange={setCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Categoria</DialogTitle>
+          </DialogHeader>
+          {categoryTxLive && (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Transação: <strong>{categoryTxLive.displayName}</strong>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {categories.map((c) => (
+                  <Button
+                    key={c.id}
+                    variant={categoryTxLive.categoryId === c.id ? "default" : "outline"}
+                    size="sm"
+                    className="justify-start"
+                    onClick={() => handleCategoryChange(categoryTxLive.id, c.id, categoryTxLive.description)}
+                  >
+                    <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: c.color }} />
+                    {c.name}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Novo lancamento a partir da transacao (botao "+") */}
+      <NewLaunchDialog
+        open={launchOpen}
+        onOpenChange={setLaunchOpen}
+        prefill={launchPrefill}
+        onCreated={() => toast.success("Lançamento criado", { description: "Confira na aba Lançamentos." })}
+      />
+
       {/* Editar nome + observacao */}
-      <Dialog open={!!editTx} onOpenChange={(open) => !open && setEditTx(null)}>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar transação</DialogTitle>
@@ -274,7 +345,7 @@ export default function Transactions() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTx(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
             <Button onClick={saveEdit} disabled={updateDetails.isPending}>
               {updateDetails.isPending ? "Salvando..." : "Salvar"}
             </Button>
@@ -283,7 +354,7 @@ export default function Transactions() {
       </Dialog>
 
       {/* Detalhes da transacao */}
-      <Dialog open={!!detailsTx} onOpenChange={(open) => !open && setDetailsTx(null)}>
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Detalhes da transação</DialogTitle>
@@ -350,13 +421,13 @@ export default function Transactions() {
               variant="outline"
               onClick={() => {
                 if (detailsTx) openEdit(detailsTx);
-                setDetailsTx(null);
+                setDetailsOpen(false);
               }}
             >
               <Pencil className="h-3.5 w-3.5 mr-1.5" />
               Editar
             </Button>
-            <Button onClick={() => setDetailsTx(null)}>Fechar</Button>
+            <Button onClick={() => setDetailsOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

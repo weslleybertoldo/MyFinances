@@ -142,6 +142,9 @@ interface CreateLaunchInput {
   card_id?: string;
   recurring?: boolean;
   installments?: number;
+  /** Nasce ja pago (ex.: lancamento criado a partir de uma transacao do extrato).
+   *  Em parcelas/recorrente vale SO pra 1a linha: as proximas sao futuro e ficam pendentes. */
+  paid?: boolean;
 }
 
 export function useCreateFutureLaunch() {
@@ -171,6 +174,7 @@ export function useCreateFutureLaunch() {
             group_id: groupId,
             parcel_number: i + 1,
             total_parcels: launch.installments,
+            paid: !!launch.paid && i === 0,
           });
         }
         const { error } = await supabase.from("future_launches").insert(rows);
@@ -189,6 +193,7 @@ export function useCreateFutureLaunch() {
             card_id: cardId,
             recurring: true,
             group_id: groupId,
+            paid: !!launch.paid && i === 0,
           });
         }
         const { error } = await supabase.from("future_launches").insert(rows);
@@ -203,6 +208,7 @@ export function useCreateFutureLaunch() {
           category_id: launch.category_id ?? null,
           card_id: cardId,
           recurring: false,
+          paid: !!launch.paid,
         });
         if (error) throw error;
       }
